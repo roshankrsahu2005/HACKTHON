@@ -46,11 +46,56 @@ import { MedicineScreen } from './components/screens/MedicineScreen';
 import { HistoryScreen } from './components/screens/HistoryScreen';
 import { ProfileScreen } from './components/screens/ProfileScreen';
 import { SettingsScreen } from './components/screens/SettingsScreen';
+import { getSupabaseClient } from './utils/supabase';
 
 export default function App() {
-  // Authentication State (Default: false to show Login first)
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
+  // Authentication State with localStorage persistence
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(() => {
+    try {
+      const saved = localStorage.getItem('h2h_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('h2h_authenticated') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Check for active Supabase OAuth session on mount
+  useEffect(() => {
+    const client = getSupabaseClient();
+    if (!client) return;
+
+    client.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const authUser: AppUser = {
+          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Clinician',
+          email: session.user.email || 'clinician.google@hear2heal.com'
+        };
+        handleLoginSuccess(authUser);
+      }
+    });
+
+    const { data: { subscription } } = client.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const authUser: AppUser = {
+          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Clinician',
+          email: session.user.email || 'clinician.google@hear2heal.com'
+        };
+        handleLoginSuccess(authUser);
+      }
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, []);
 
   // Global Theme Option State
   const [currentTheme, setCurrentTheme] = useState<ThemeOption>(() => {
@@ -86,13 +131,25 @@ export default function App() {
   const handleLoginSuccess = (user: AppUser) => {
     setCurrentUser(user);
     setIsAuthenticated(true);
-    setCurrentScreen('splash'); // 1st me hi login karke hi overview me enter karega
+    try {
+      localStorage.setItem('h2h_authenticated', 'true');
+      localStorage.setItem('h2h_user', JSON.stringify(user));
+    } catch (e) {
+      console.warn('Storage notice:', e);
+    }
+    setCurrentScreen('splash');
   };
 
   // Handle logout
   const handleLogout = () => {
     setIsAuthenticated(false);
     setCurrentUser(null);
+    try {
+      localStorage.removeItem('h2h_authenticated');
+      localStorage.removeItem('h2h_user');
+    } catch (e) {
+      console.warn('Storage notice:', e);
+    }
   };
 
   // Swap languages
