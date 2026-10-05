@@ -134,7 +134,7 @@ export const SidebarDashboard: React.FC<SidebarDashboardProps> = ({
     <aside
       className={`w-72 bg-[#eef3fa] border-r border-[#dbe4f0] flex flex-col shrink-0 select-none shadow-[6px_0_16px_#c0cfdf] transition-all duration-300 ease-in-out ${className}`}
     >
-      {/* Sidebar Header / Hospital Ward Telemetry + Close/OFF Toggle */}
+      {/* Sidebar Header / Hospital Triage Suite + Close/OFF Toggle */}
       <div className="p-3.5 border-b border-[#dbe4f0] bg-[#eef3fa] flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl neu-raised text-blue-600 flex items-center justify-center">
@@ -351,7 +351,7 @@ export const SidebarDashboard: React.FC<SidebarDashboardProps> = ({
         </div>
       </div>
 
-      {/* Sidebar Footer / Active Telemetry Card */}
+      {/* Sidebar Footer / Active Language Pair Card */}
       <div className="p-3.5 border-t border-[#dbe4f0] bg-[#eef3fa] text-xs">
         <div className="p-3 neu-card rounded-2xl">
           <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 mb-2">

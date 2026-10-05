@@ -86,22 +86,3 @@ export interface MedicineInstruction {
   duration: string;
 }
 
-export interface PatientVitals {
-  heartRate: number; // BPM
-  spO2: number; // %
-  systolicBP: number; // mmHg
-  diastolicBP: number; // mmHg
-  temperature: number; // °F
-  respiratoryRate: number; // breaths/min
-  rhythmStatus: string;
-}
-
-export const INITIAL_VITALS: PatientVitals = {
-  heartRate: 74,
-  spO2: 98,
-  systolicBP: 120,
-  diastolicBP: 80,
-  temperature: 98.6,
-  respiratoryRate: 16,
-  rhythmStatus: 'Normal Sinus Rhythm'
-};
