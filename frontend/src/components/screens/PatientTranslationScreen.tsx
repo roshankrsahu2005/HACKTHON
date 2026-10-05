@@ -23,7 +23,8 @@ import {
   UserCheck,
   Languages,
   Clock,
-  Sparkle
+  Sparkle,
+  CornerDownLeft
 } from 'lucide-react';
 import { ScreenId, Language } from '../../types';
 import { playTextToSpeech, stopTextToSpeech } from '../../utils/audio';
@@ -66,8 +67,8 @@ const INITIAL_CHAT_MESSAGES: ChatItem[] = [
   {
     id: 'msg-1',
     sender: 'patient',
-    originalText: 'डॉक्टर साहब, मुझे 2 घंटे से सीने में बहुत तेज दर्द हो रहा है और चक्कर आ रहे हैं।',
-    translatedText: 'Doctor, I have had severe crushing chest pain for 2 hours and feeling dizzy.',
+    originalText: 'डॉक्टर साहब, मुझे 2 घंटे से सीने में बहुत तेज दर्द हो रहा है और सांस फूल रही है।',
+    translatedText: 'Doctor, I have had severe crushing chest pain for 2 hours and difficulty breathing.',
     sourceLang: 'Hindi',
     targetLang: 'English',
     timestamp: '10:14 AM',
@@ -101,6 +102,38 @@ const QUICK_CHAT_PROMPTS = [
   'Please take deep breaths and stay calm.'
 ];
 
+// Offline instant translation dictionary for common doctor queries
+const DOCTOR_OFFLINE_TRANSLATIONS: Record<string, Record<string, string>> = {
+  'where is the pain radiating?': {
+    hi: 'दर्द कहाँ फैल रहा है?',
+    bn: 'ব্যথা কোথায় ছড়িয়ে পড়ছে?',
+    ta: 'வலி எங்கே பரவுகிறது?',
+    te: 'నొప్పి ఎక్కడికి వ్యాపిస్తోంది?',
+    mr: 'कळा/त्रास कुठे पसरत आहेत?'
+  },
+  'when did these symptoms begin?': {
+    hi: 'ये लक्षण कब से शुरू हुए?',
+    bn: 'এই লক্ষণগুলো কখন শুরু হয়েছিল?',
+    ta: 'இந்த அறிகுறிகள் எப்போது தொடங்கின?',
+    te: 'ఈ లక్షణాలు ఎప్పుడు ప్రారంభమయ్యాయి?',
+    mr: 'ही लक्षणे कधीपासून सुरू झाली?'
+  },
+  'do you have any known drug allergies?': {
+    hi: 'क्या आपको किसी दवा से एलर्जी है?',
+    bn: 'আপনার কি কোনো ওষুধে অ্যালার্জি আছে?',
+    ta: 'உங்களுக்கு ஏதேனும் மருந்து ஒவ்வாமை உள்ளதா?',
+    te: 'మీకు ఏదైనా మందులకు అలర్జీ ఉందా?',
+    mr: 'तुम्हाला कोणत्याही औषधाची ॲलर्जी आहे का?'
+  },
+  'please take deep breaths and stay calm.': {
+    hi: 'कृपया गहरी सांस लें और शांत रहें।',
+    bn: 'দয়া করে গভীর শ্বাস নিন এবং শান্ত থাকুন।',
+    ta: 'தயவுசெய்து ஆழமாக மூச்சு விடுங்கள், அமைதியாக இருங்கள்.',
+    te: 'దయచేసి లోతుగా శ్వాస తీసుకోండి మరియు ప్రశాంతంగా ఉండండి.',
+    mr: 'कृपया दीर्घ श्वास घ्या आणि शांत राहा.'
+  }
+};
+
 interface PatientTranslationScreenProps {
   onNavigate: (screen: ScreenId) => void;
   patientLang: Language;
@@ -117,7 +150,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
   onSelectDoctorLang
 }) => {
   // Screen sub-view tab: 'triage' (Voice Triage view) or 'chat' (Bilingual Chat view)
-  const [activeViewMode, setActiveViewMode] = useState<'triage' | 'chat'>('triage');
+  const [activeViewMode, setActiveViewMode] = useState<'triage' | 'chat'>('chat');
 
   // AI Auto-Detection Mode (default ON for emergency readiness)
   const [isAutoDetectMode, setIsAutoDetectMode] = useState<boolean>(true);
@@ -144,6 +177,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
   const [chatInput, setChatInput] = useState<string>('');
   const [chatSender, setChatSender] = useState<'patient' | 'doctor'>('patient');
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
+  const [isChatSending, setIsChatSending] = useState<boolean>(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -162,9 +196,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort();
-        } catch {
-          // ignore
-        }
+        } catch {}
       }
     };
   }, []);
@@ -297,9 +329,8 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
 
     if (!SpeechRecognition) {
       setRecognitionError(
-        'Speech recognition is not supported in this browser. Please use the Keyboard or Emergency Presets.'
+        'Speech recognition is not supported in this browser. Please type with the keyboard.'
       );
-      setIsTypingMode(true);
       return;
     }
 
@@ -325,7 +356,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
       recognition.onresult = (event: any) => {
         let interimText = '';
         let finalText = '';
-        for (let i = event.results.length - 1; i < event.results.length; i++) {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
           const trans = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
             finalText += trans;
@@ -354,7 +385,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
         } else if (event.error === 'no-speech') {
           setRecognitionError('No speech was detected. Please tap the mic and speak clearly.');
         } else {
-          setRecognitionError(`Speech notice (${event.error}). You can use keyboard or presets.`);
+          setRecognitionError(`Speech notice (${event.error}). You can use keyboard typing.`);
         }
       };
 
@@ -370,23 +401,33 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
     }
   };
 
-  // Send a new bilingual chat message
-  const handleSendChatMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const textToSend = chatInput.trim();
+  // Send a new bilingual chat message (Instant & Zero-Delay)
+  const handleSendChatMessage = async (e?: React.FormEvent, directText?: string, forcedSender?: 'patient' | 'doctor') => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    const sender = forcedSender || chatSender;
+    const textToSend = (directText || chatInput).trim();
     if (!textToSend) return;
 
+    setIsChatSending(true);
     const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     let translated = '';
     let triageLvl: 'red' | 'yellow' | 'green' = 'green';
 
-    if (chatSender === 'patient') {
+    if (sender === 'patient') {
+      // 1. Instant NLP analysis for Patient
       const parsed = processPatientSpeech(textToSend, 'en');
       translated = parsed.englishTranslation;
       triageLvl = parsed.triageLevel;
 
-      // Cloud sync
+      // Update active triage state
+      setInputText(textToSend);
+
+      // Cloud sync to Supabase
       syncTranslationToSupabase(
         'patient',
         parsed.detectedLanguage.name,
@@ -396,9 +437,22 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
         triageLvl
       );
     } else {
-      // Doctor sending in English -> Translate to Patient Language
+      // 2. Doctor Query -> Check offline translation map first
+      const lower = textToSend.toLowerCase().trim();
+      const offlineMatch = DOCTOR_OFFLINE_TRANSLATIONS[lower];
+
+      if (offlineMatch && offlineMatch[patientLang.id]) {
+        translated = offlineMatch[patientLang.id];
+      } else if (patientLang.id === 'hi') {
+        // Fallback translation
+        translated = `[हिन्दी अनुवाद]: ${textToSend}`;
+      } else {
+        translated = `[${patientLang.name} Translation]: ${textToSend}`;
+      }
+
+      // Try background backend translation
       try {
-        const res = await fetch('http://localhost:5000/api/translate', {
+        fetch('http://localhost:5000/api/translate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -406,34 +460,39 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
             sourceLang: 'English',
             targetLang: patientLang.id
           })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          translated =
-            patientLang.id === 'hi'
-              ? data.hindiTranslation
-              : data.englishTranslation || textToSend;
-        } else {
-          translated = textToSend;
-        }
-      } catch {
-        translated = textToSend;
-      }
+        })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data) {
+              const liveTrans =
+                patientLang.id === 'hi'
+                  ? data.hindiTranslation
+                  : data.englishTranslation || textToSend;
+              if (liveTrans && liveTrans !== textToSend) {
+                setChatMessages((prev) =>
+                  prev.map((m) => (m.id === newMsg.id ? { ...m, translatedText: liveTrans } : m))
+                );
+              }
+            }
+          })
+          .catch(() => {});
+      } catch {}
     }
 
     const newMsg: ChatItem = {
       id: 'msg-' + Date.now(),
-      sender: chatSender,
+      sender: sender,
       originalText: textToSend,
       translatedText: translated,
-      sourceLang: chatSender === 'patient' ? patientLang.name : 'English',
-      targetLang: chatSender === 'patient' ? 'English' : patientLang.name,
+      sourceLang: sender === 'patient' ? patientLang.name : 'English',
+      targetLang: sender === 'patient' ? 'English' : patientLang.name,
       timestamp: timeString,
-      triageLevel: chatSender === 'patient' ? triageLvl : undefined
+      triageLevel: sender === 'patient' ? triageLvl : undefined
     };
 
     setChatMessages((prev) => [...prev, newMsg]);
     setChatInput('');
+    setIsChatSending(false);
   };
 
   // Play audio for specific chat message
@@ -486,21 +545,8 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
             <div className="neu-pressed p-1 rounded-2xl flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => setActiveViewMode('triage')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
-                  activeViewMode === 'triage'
-                    ? 'neu-button-primary shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Mic className="w-3.5 h-3.5" />
-                <span>Voice Triage</span>
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setActiveViewMode('chat')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
                   activeViewMode === 'chat'
                     ? 'neu-button-primary shadow-sm'
                     : 'text-slate-600 hover:text-slate-900'
@@ -508,7 +554,20 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
               >
                 <MessageSquare className="w-3.5 h-3.5" />
                 <span>Live Chat</span>
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveViewMode('triage')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+                  activeViewMode === 'triage'
+                    ? 'neu-button-primary shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Mic className="w-3.5 h-3.5" />
+                <span>Voice Triage</span>
               </button>
             </div>
 
@@ -544,76 +603,123 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
         {/* ------------------------------------------------------------- */}
         {activeViewMode === 'chat' ? (
           <div className="space-y-3.5">
-            {/* Chat Conversation Thread */}
-            <div className="p-4 neu-card rounded-3xl space-y-3 min-h-[360px] max-h-[440px] overflow-y-auto bg-white/50">
-              <div className="text-center pb-2 border-b border-slate-200/60">
-                <span className="text-[10px] font-bold text-slate-400 neu-pill px-3 py-1">
-                  Bilingual Session · {patientLang.name} ↔ English · Live Stream
-                </span>
+            {/* Chat Top Controls & Simulation Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Active Language Pair: <strong>{patientLang.name} ↔ English</strong></span>
               </div>
 
-              {chatMessages.map((msg) => {
-                const isPatient = msg.sender === 'patient';
-                return (
-                  <div
-                    key={msg.id}
-                    className={`flex flex-col ${isPatient ? 'items-start' : 'items-end'}`}
-                  >
-                    <div className="flex items-center gap-1.5 mb-1 px-1">
-                      <span className="text-[11px] font-extrabold text-slate-600 flex items-center gap-1">
-                        {isPatient ? (
-                          <>
-                            <User className="w-3.5 h-3.5 text-blue-600" />
-                            <span>Patient ({msg.sourceLang})</span>
-                          </>
-                        ) : (
-                          <>
-                            <Stethoscope className="w-3.5 h-3.5 text-indigo-600" />
-                            <span>Dr. Response ({msg.sourceLang})</span>
-                          </>
-                        )}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-mono">{msg.timestamp}</span>
-                      {msg.triageLevel === 'red' && (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-black neu-button-emergency">
-                          RED
-                        </span>
-                      )}
-                    </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleSendChatMessage(
+                      undefined,
+                      'मुझे सांस लेने में बहुत परेशानी हो रही है।',
+                      'patient'
+                    )
+                  }
+                  className="px-2.5 py-1 rounded-xl neu-button text-[10px] font-extrabold text-blue-700 hover:text-blue-900 cursor-pointer"
+                >
+                  + Test Patient Speech
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleSendChatMessage(
+                      undefined,
+                      'We are starting oxygen support immediately.',
+                      'doctor'
+                    )
+                  }
+                  className="px-2.5 py-1 rounded-xl neu-button text-[10px] font-extrabold text-indigo-700 hover:text-indigo-900 cursor-pointer"
+                >
+                  + Test Doctor Reply
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChatMessages([])}
+                  className="p-1 rounded-xl neu-button text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
+                  title="Clear Chat History"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
 
+            {/* Chat Conversation Thread */}
+            <div className="p-4 neu-card rounded-3xl space-y-3 h-[380px] overflow-y-auto bg-white/60 shadow-inner">
+              {chatMessages.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
+                  <MessageSquare className="w-10 h-10 stroke-[1.5] mb-2 text-slate-300" />
+                  <p className="text-sm font-bold text-slate-600">No messages in current session</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Select a sender below and type or speak with the Mic to start live translation.
+                  </p>
+                </div>
+              ) : (
+                chatMessages.map((msg) => {
+                  const isPatient = msg.sender === 'patient';
+                  return (
                     <div
-                      className={`max-w-[85%] sm:max-w-[75%] p-3.5 rounded-2xl relative group shadow-sm ${
-                        isPatient
-                          ? 'neu-card border-l-4 border-l-blue-600 bg-blue-50/40 text-slate-900 rounded-tl-sm'
-                          : 'neu-pressed border-r-4 border-r-indigo-600 bg-indigo-50/50 text-slate-900 rounded-tr-sm'
-                      }`}
+                      key={msg.id}
+                      className={`flex flex-col ${isPatient ? 'items-start' : 'items-end'}`}
                     >
-                      {/* Original text */}
-                      <p className="text-sm font-bold leading-relaxed">{msg.originalText}</p>
+                      <div className="flex items-center gap-1.5 mb-1 px-1">
+                        <span className="text-[11px] font-extrabold text-slate-600 flex items-center gap-1">
+                          {isPatient ? (
+                            <>
+                              <User className="w-3.5 h-3.5 text-blue-600" />
+                              <span>Patient ({msg.sourceLang})</span>
+                            </>
+                          ) : (
+                            <>
+                              <Stethoscope className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>Dr. Response ({msg.sourceLang})</span>
+                            </>
+                          )}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">{msg.timestamp}</span>
+                        {msg.triageLevel === 'red' && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-black neu-button-emergency">
+                            RED
+                          </span>
+                        )}
+                      </div>
 
-                      {/* Translated Subtitle */}
-                      <div className="mt-2 pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2">
-                        <div className="text-xs font-extrabold text-blue-700 italic">
-                          <span>&rarr; {msg.translatedText}</span>
+                      <div
+                        className={`max-w-[85%] sm:max-w-[75%] p-3.5 rounded-2xl relative group shadow-sm ${
+                          isPatient
+                            ? 'neu-card border-l-4 border-l-blue-600 bg-blue-50/50 text-slate-900 rounded-tl-sm'
+                            : 'neu-pressed border-r-4 border-r-indigo-600 bg-indigo-50/50 text-slate-900 rounded-tr-sm'
+                        }`}
+                      >
+                        <p className="text-sm font-bold leading-relaxed">{msg.originalText}</p>
+
+                        <div className="mt-2 pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2">
+                          <div className="text-xs font-extrabold text-blue-700 italic">
+                            <span>&rarr; {msg.translatedText}</span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handlePlayChatMessageAudio(msg)}
+                            className={`p-1 rounded-lg transition-all cursor-pointer ${
+                              playingMessageId === msg.id
+                                ? 'neu-button-primary animate-pulse'
+                                : 'neu-button text-slate-500 hover:text-blue-600'
+                            }`}
+                            title="Listen translated speech"
+                          >
+                            <Volume2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handlePlayChatMessageAudio(msg)}
-                          className={`p-1 rounded-lg transition-all cursor-pointer ${
-                            playingMessageId === msg.id
-                              ? 'neu-button-primary animate-pulse'
-                              : 'neu-button text-slate-500 hover:text-blue-600'
-                          }`}
-                          title="Listen translated speech"
-                        >
-                          <Volume2 className="w-3.5 h-3.5" />
-                        </button>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
               <div ref={chatEndRef} />
             </div>
 
@@ -625,10 +731,11 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
                   type="button"
                   onClick={() => {
                     setChatSender('doctor');
-                    setChatInput(prompt);
+                    handleSendChatMessage(undefined, prompt, 'doctor');
                   }}
-                  className="shrink-0 px-3 py-1.5 rounded-xl neu-button text-[11px] font-bold text-slate-700 hover:text-blue-700 cursor-pointer transition-all"
+                  className="shrink-0 px-3 py-1.5 rounded-xl neu-button text-[11px] font-bold text-slate-700 hover:text-blue-700 cursor-pointer transition-all flex items-center gap-1"
                 >
+                  <Sparkle className="w-3 h-3 text-amber-500" />
                   <span>{prompt}</span>
                 </button>
               ))}
@@ -643,10 +750,10 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
                     <button
                       type="button"
                       onClick={() => setChatSender('patient')}
-                      className={`px-2.5 py-0.5 text-xs font-extrabold rounded-lg transition-all cursor-pointer ${
+                      className={`px-2.5 py-1 text-xs font-extrabold rounded-lg transition-all cursor-pointer ${
                         chatSender === 'patient'
-                          ? 'neu-pill text-blue-700 font-black'
-                          : 'text-slate-600'
+                          ? 'neu-pill text-blue-700 font-black shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
                       🗣️ Patient ({patientLang.name})
@@ -654,10 +761,10 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
                     <button
                       type="button"
                       onClick={() => setChatSender('doctor')}
-                      className={`px-2.5 py-0.5 text-xs font-extrabold rounded-lg transition-all cursor-pointer ${
+                      className={`px-2.5 py-1 text-xs font-extrabold rounded-lg transition-all cursor-pointer ${
                         chatSender === 'doctor'
-                          ? 'neu-pill text-indigo-700 font-black'
-                          : 'text-slate-600'
+                          ? 'neu-pill text-indigo-700 font-black shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
                       👨‍⚕️ Doctor (English)
@@ -666,7 +773,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
                 </div>
 
                 <span className="text-[10px] text-slate-400 font-semibold">
-                  Auto-Translates & Records
+                  Press Enter ↵ to Send
                 </span>
               </div>
 
@@ -677,8 +784,8 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
                   onChange={(e) => setChatInput(e.target.value)}
                   placeholder={
                     chatSender === 'patient'
-                      ? `Type message in ${patientLang.name} or speak with Mic...`
-                      : 'Type clinical query/instruction in English...'
+                      ? `Type in ${patientLang.name} or tap Mic to speak...`
+                      : 'Type clinical query or instruction in English...'
                   }
                   className="flex-1 px-4 py-2.5 text-sm font-bold neu-input rounded-2xl focus:ring-2 focus:ring-blue-500/30"
                 />
@@ -687,7 +794,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
                 <button
                   type="button"
                   onClick={handleToggleRecord}
-                  className={`p-2.5 rounded-2xl transition-all cursor-pointer ${
+                  className={`p-2.5 rounded-2xl transition-all cursor-pointer shadow-md ${
                     isRecording
                       ? 'neu-button-emergency animate-pulse'
                       : 'neu-button text-blue-600 hover:text-blue-800'
@@ -700,8 +807,8 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
                 {/* Send button */}
                 <button
                   type="submit"
-                  disabled={!chatInput.trim()}
-                  className="px-4 py-2.5 rounded-2xl neu-button-primary text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                  disabled={!chatInput.trim() || isChatSending}
+                  className="px-4 py-2.5 rounded-2xl neu-button-primary text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shadow-md"
                 >
                   <span>Send</span>
                   <Send className="w-3.5 h-3.5" />
@@ -711,7 +818,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
           </div>
         ) : (
           /* ------------------------------------------------------------- */
-          /* VIEW 2: VOICE TRIAGE DASHBOARD VIEW (ORIGINAL VIEW)           */
+          /* VIEW 2: VOICE TRIAGE DASHBOARD VIEW                           */
           /* ------------------------------------------------------------- */
           <>
             {/* AI Zero-Click Auto-Detect Mode Banner */}
