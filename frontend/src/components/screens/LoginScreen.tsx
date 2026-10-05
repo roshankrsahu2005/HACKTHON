@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, ArrowRight, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Lock, Mail, ArrowRight, Eye, EyeOff, ShieldCheck, Sparkles, CheckCircle2 } from 'lucide-react';
 import {
   isSupabaseConfigured,
   getSupabaseClient,
@@ -20,89 +20,64 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [rememberMe, setRememberMe] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [authError, setAuthError] = useState<string>('');
+  const [loginSuccessMessage, setLoginSuccessMessage] = useState<string>('');
 
-  const trySupabaseLogin = async (loginEmail: string, loginPassword: string) => {
-    const client = getSupabaseClient();
-    if (!client) {
-      return undefined;
-    }
-
-    try {
-      const { error } = await client.auth.signInWithPassword({
-        email: loginEmail,
-        password: loginPassword,
-      });
-
-      if (!error) {
-        setAuthError('');
-        return true;
-      }
-
-      // If user not found, try signing up automatically in Supabase Auth
-      if (error.message.toLowerCase().includes('invalid login credentials') || error.message.toLowerCase().includes('user not found')) {
-        const { error: signUpError } = await client.auth.signUp({
-          email: loginEmail,
-          password: loginPassword,
-        });
-
-        if (!signUpError) {
-          setAuthError('');
-          return true;
-        }
-      }
-    } catch (e) {
-      console.warn('Supabase auth attempt notice:', e);
-    }
-
-    // Return undefined to allow seamless local/offline clinician login fallback
-    return undefined;
-  };
-
-  const handleSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    setAuthError('');
+  const executeLogin = (user: AppUser) => {
     setIsLoading(true);
-
-    const userName = email ? email.split('@')[0] : 'Clinician';
-    const userEmail = email || 'demo@hear2heal.com';
-
-    // Fire Supabase auth in background without blocking login
-    try {
-      const client = getSupabaseClient();
-      if (client) {
-        client.auth.signInWithPassword({ email: userEmail, password }).catch(() => {});
-      }
-    } catch {
-      // Ignore background auth errors
-    }
-
-    // Instant zero-delay login transition
+    setLoginSuccessMessage(`Signing in as ${user.name}...`);
     setTimeout(() => {
       setIsLoading(false);
-      onLoginSuccess({
-        name: userName,
-        email: userEmail
-      });
-    }, 120);
+      onLoginSuccess(user);
+    }, 100);
+  };
+
+  const handleSubmit = (e?: React.FormEvent | React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    const trimmedEmail = email.trim() || 'demo@hear2heal.com';
+    const userName = trimmedEmail.includes('@')
+      ? trimmedEmail.split('@')[0]
+      : trimmedEmail;
+
+    // Fire Supabase auth in background (non-blocking)
+    try {
+      const client = getSupabaseClient();
+      if (client && isSupabaseConfigured()) {
+        client.auth.signInWithPassword({
+          email: trimmedEmail.includes('@') ? trimmedEmail : `${trimmedEmail}@hear2heal.com`,
+          password: password || 'password123'
+        }).catch(() => {});
+      }
+    } catch {
+      // Ignore background auth error
+    }
+
+    executeLogin({
+      name: userName.charAt(0).toUpperCase() + userName.slice(1),
+      email: trimmedEmail.includes('@') ? trimmedEmail : `${trimmedEmail}@hear2heal.com`
+    });
   };
 
   const handleQuickRoleSelect = (roleName: string, roleEmail: string) => {
     setEmail(roleEmail);
     setPassword('password123');
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      onLoginSuccess({
-        name: roleName,
-        email: roleEmail
-      });
-    }, 100);
+    executeLogin({
+      name: roleName,
+      email: roleEmail
+    });
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
     setIsLoading(true);
-    setAuthError('');
+    setLoginSuccessMessage('Authenticating with Google...');
 
     try {
       const client = getSupabaseClient();
@@ -119,34 +94,29 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         });
 
         if (!error && data?.url) {
-          // If browser redirects to Google, navigation will happen automatically
           window.location.href = data.url;
           return;
         }
-
-        if (error) {
-          console.warn('Supabase Google OAuth provider notice:', error.message);
-        }
       }
-    } catch (e) {
-      console.warn('Google OAuth notice:', e);
+    } catch (err) {
+      console.warn('Google sign in note:', err);
     }
 
-    // Instant Google Clinician Session fallback
+    // Direct Google Clinician Session fallback
     setTimeout(() => {
       setIsLoading(false);
       onLoginSuccess({
         name: 'Dr. Clinician (Google)',
         email: 'clinician.google@hear2heal.com'
       });
-    }, 120);
+    }, 100);
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 relative font-sans text-slate-800 overflow-hidden">
-      <div className="absolute -top-20 left-10 h-56 w-56 rounded-full bg-blue-400/20 blur-3xl" />
-      <div className="absolute right-0 top-20 h-64 w-64 rounded-full bg-cyan-400/20 blur-3xl" />
-      <div className="absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-emerald-400/10 blur-3xl" />
+    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 relative font-sans text-slate-800 overflow-hidden bg-[#eef3fa]">
+      <div className="absolute -top-20 left-10 h-56 w-56 rounded-full bg-blue-400/20 blur-3xl pointer-events-none" />
+      <div className="absolute right-0 top-20 h-64 w-64 rounded-full bg-cyan-400/20 blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-emerald-400/10 blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-6">
@@ -161,7 +131,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           </p>
         </div>
 
-        <div className="glass-panel rounded-[30px] p-6 sm:p-8 border border-white/60">
+        <div className="glass-panel rounded-[30px] p-6 sm:p-8 border border-white/60 shadow-xl">
           <div className="mb-5 pb-3 border-b border-slate-200/80 flex items-center justify-between">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600/80">Secure Portal</p>
@@ -204,8 +174,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           {/* Divider */}
           <div className="relative flex items-center justify-center my-4">
             <div className="border-t border-slate-200/80 w-full" />
-            <span className="bg-white/90 px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider absolute">
-              or email sign-in
+            <span className="bg-[#f0f4f9] px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider absolute">
+              or clinician sign-in
             </span>
           </div>
 
@@ -218,21 +188,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               <button
                 type="button"
                 onClick={() => handleQuickRoleSelect('Dr. Sharma', 'doctor@hear2heal.com')}
-                className="py-1.5 px-2 rounded-xl neu-button text-[11px] font-bold text-slate-700 hover:text-blue-700 hover:border-blue-400 cursor-pointer transition-all text-center truncate"
+                className="py-2 px-2 rounded-xl neu-button text-[11px] font-bold text-slate-700 hover:text-blue-700 hover:border-blue-400 cursor-pointer transition-all text-center truncate"
               >
                 👨‍⚕️ Doctor
               </button>
               <button
                 type="button"
                 onClick={() => handleQuickRoleSelect('Nurse Priya', 'nurse@hear2heal.com')}
-                className="py-1.5 px-2 rounded-xl neu-button text-[11px] font-bold text-slate-700 hover:text-blue-700 hover:border-blue-400 cursor-pointer transition-all text-center truncate"
+                className="py-2 px-2 rounded-xl neu-button text-[11px] font-bold text-slate-700 hover:text-blue-700 hover:border-blue-400 cursor-pointer transition-all text-center truncate"
               >
                 👩‍⚕️ Nurse / EMT
               </button>
               <button
                 type="button"
                 onClick={() => handleQuickRoleSelect('Triage Officer', 'triage@hear2heal.com')}
-                className="py-1.5 px-2 rounded-xl neu-button text-[11px] font-bold text-slate-700 hover:text-blue-700 hover:border-blue-400 cursor-pointer transition-all text-center truncate"
+                className="py-2 px-2 rounded-xl neu-button text-[11px] font-bold text-slate-700 hover:text-blue-700 hover:border-blue-400 cursor-pointer transition-all text-center truncate"
               >
                 🚨 Triage Lead
               </button>
@@ -253,7 +223,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email or username"
-                  required
                   className="w-full pl-11 pr-3 py-3 text-sm font-semibold rounded-2xl border border-slate-200/80 bg-white/80 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
                 />
               </div>
@@ -272,7 +241,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  required
                   className="w-full pl-11 pr-11 py-3 text-sm font-semibold rounded-2xl border border-slate-200/80 bg-white/80 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
                 />
                 <button
@@ -299,13 +267,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
             <button
               type="submit"
+              onClick={handleSubmit}
               disabled={isLoading}
               className="premium-button w-full mt-3 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-sm tracking-wide transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-75 shadow-[0_14px_30px_-10px_rgba(37,99,235,0.75)] border border-blue-400/40"
             >
               {isLoading ? (
                 <>
                   <span className="w-4.5 h-4.5 border-2 border-white/35 border-t-white rounded-full animate-spin" />
-                  <span>Signing In...</span>
+                  <span>{loginSuccessMessage || 'Signing In...'}</span>
                 </>
               ) : (
                 <>
@@ -314,11 +283,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 </>
               )}
             </button>
-            {authError && (
-              <p role="alert" className="text-xs font-medium text-red-600 pt-1 text-center">
-                {authError}
-              </p>
-            )}
           </form>
         </div>
 
