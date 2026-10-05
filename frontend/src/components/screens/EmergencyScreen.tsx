@@ -265,7 +265,7 @@ export const EmergencyScreen: React.FC<EmergencyScreenProps> = ({ onNavigate }) 
 📋 Priority Action:
 ${activeProtocol.stepsEn.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 ------------------------------------------------
-📞 Emergency Hotlines Dispatched: 108 (Ambulance) / 112 (National)`;
+📞 Emergency Hotline Dispatched: 108 (National Ambulance / ER)`;
   };
 
   const handleCopyDispatch = () => {
@@ -360,40 +360,32 @@ ${activeProtocol.stepsEn.map((s, i) => `${i + 1}. ${s}`).join('\n')}
       </div>
 
       <div className="p-4 sm:p-5 flex-1 overflow-y-auto space-y-4">
-        {/* 2. 1-TAP EMERGENCY HOTLINE DISPATCH BAR (108 / 112 / 102) */}
-        <div className="neu-card p-3 rounded-2xl border border-red-200/80 bg-red-50/40">
+        {/* 2. 1-TAP EMERGENCY 108 DISPATCH BAR */}
+        <div className="neu-card p-3.5 rounded-2xl border border-red-200/80 bg-red-50/40">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] font-black text-red-700 flex items-center gap-1.5 uppercase tracking-wider">
               <PhoneCall className="w-3.5 h-3.5 text-red-600 animate-pulse" />
-              <span>1-Tap National Emergency Dispatch</span>
+              <span>1-Tap Ambulance & ER Dispatch</span>
             </span>
-            <span className="text-[10px] neu-pill px-2 py-0.5 text-red-700 font-extrabold">Instant Dial</span>
+            <span className="text-[10px] neu-pill px-2 py-0.5 text-red-700 font-extrabold">Emergency Hotline</span>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div>
             <a
               href="tel:108"
-              className="py-2 px-2 rounded-xl neu-button text-center transition-all hover:scale-105 active:scale-95 group cursor-pointer"
+              className="w-full py-2.5 px-4 rounded-xl neu-button flex items-center justify-between transition-all hover:scale-[1.01] active:scale-95 group cursor-pointer border border-red-200/60 bg-white"
               title="Call 108 Ambulance"
             >
-              <div className="text-xs font-black text-red-700 group-hover:text-red-800">🚑 108</div>
-              <div className="text-[10px] text-slate-500 font-bold leading-tight">Ambulance / ER</div>
-            </a>
-            <a
-              href="tel:112"
-              className="py-2 px-2 rounded-xl neu-button text-center transition-all hover:scale-105 active:scale-95 group cursor-pointer"
-              title="Call 112 National Emergency"
-            >
-              <div className="text-xs font-black text-blue-700 group-hover:text-blue-800">🚨 112</div>
-              <div className="text-[10px] text-slate-500 font-bold leading-tight">All-India Helpline</div>
-            </a>
-            <a
-              href="tel:102"
-              className="py-2 px-2 rounded-xl neu-button text-center transition-all hover:scale-105 active:scale-95 group cursor-pointer"
-              title="Call 102 Maternal Helpline"
-            >
-              <div className="text-xs font-black text-emerald-700 group-hover:text-emerald-800">🤰 102</div>
-              <div className="text-[10px] text-slate-500 font-bold leading-tight">Maternal / Child</div>
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">🚑</span>
+                <div className="text-left">
+                  <div className="text-sm font-black text-red-700 group-hover:text-red-800">Call 108 Emergency Ambulance</div>
+                  <div className="text-[10px] text-slate-500 font-semibold leading-tight">Direct National Medical Trauma & Ambulance Response</div>
+                </div>
+              </div>
+              <span className="px-3 py-1 rounded-lg bg-red-600 text-white text-xs font-black shadow-sm group-hover:bg-red-700 transition-colors">
+                DIAL 108
+              </span>
             </a>
           </div>
         </div>
