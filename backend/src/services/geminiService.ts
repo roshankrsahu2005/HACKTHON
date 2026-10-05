@@ -22,15 +22,15 @@ export interface TriageAnalysis {
 
 export async function processClinicalTranslation(request: TranslationRequest): Promise<TriageAnalysis> {
   if (!ai) {
-    // Fallback if API key is not present
-    const isEmergency = /chest pain|heart|breathing|stroke|bleed|unconscious/i.test(request.text);
+    // Clinical fallback engine supporting Hindi, Bengali, Tamil, Telugu & English emergency keywords
+    const isEmergency = /chest pain|heart|breathing|stroke|bleed|unconscious|छाती|दर्द|सीने|सांस|बेहोश|खून|हार्ट|ব্যথা|বুক|নাস|வலி|நெஞ்சு|గుండె|నొప్పి/i.test(request.text);
     return {
       detectedLanguage: request.sourceLang || 'Auto',
       englishTranslation: request.text,
       hindiTranslation: request.text,
       triageLevel: isEmergency ? 'red' : 'yellow',
-      criticalSymptoms: isEmergency ? ['Chest Pain / Breathing Difficulty'] : ['Mild Symptoms'],
-      clinicalSummary: 'Offline clinical analysis generated.',
+      criticalSymptoms: isEmergency ? ['Immediate Cardiopulmonary Symptom Alert'] : ['General Symptom'],
+      clinicalSummary: isEmergency ? 'Critical triage alert: Immediate cardiopulmonary evaluation required.' : 'Routine clinical evaluation.',
       recommendedAction: isEmergency ? 'Immediate Emergency Triage Required' : 'Standard Routine Consult',
       requiresImmediateSOS: isEmergency
     };

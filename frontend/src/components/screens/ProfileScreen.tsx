@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, User, ShieldCheck, Check, Heart, Save } from 'lucide-react';
+import { ArrowLeft, User, ShieldCheck, Check, Heart, Save, LogOut } from 'lucide-react';
 import { ScreenId, PatientProfile } from '../../types';
 import { INITIAL_PATIENT_PROFILE } from '../../data/mockData';
 import { syncProfileToSupabase } from '../../utils/supabase';
@@ -8,6 +8,7 @@ interface ProfileScreenProps {
   onNavigate: (screen: ScreenId) => void;
   profile: PatientProfile;
   onSaveProfile: (profile: PatientProfile) => void;
+  onLogout?: () => void;
 }
 
 const BLOOD_GROUPS = ['Select', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
@@ -16,6 +17,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onNavigate,
   profile,
   onSaveProfile,
+  onLogout,
 }) => {
   const [formData, setFormData] = useState<PatientProfile>(profile);
   const [isSaved, setIsSaved] = useState(false);
@@ -31,37 +33,63 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   };
 
   return (
-    <div className="flex flex-col justify-between h-full min-h-[640px] p-5 bg-slate-50 relative overflow-y-auto">
+    <div className="flex flex-col justify-between h-full min-h-[640px] p-5 sm:p-8 bg-[#eef3fa] relative overflow-y-auto rounded-3xl">
       <div>
         {/* Header */}
-        <div className="flex items-center gap-2 mb-4">
-          <button
-            onClick={() => onNavigate('patient_translation')}
-            className="w-10 h-10 -ml-2 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition-colors cursor-pointer"
-            aria-label="Back"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Patient Profile</h2>
-            <p className="text-xs text-slate-500">Save important information</p>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => onNavigate('patient_translation')}
+              className="w-10 h-10 -ml-2 rounded-2xl neu-button flex items-center justify-center text-slate-600 hover:text-slate-900 transition-all cursor-pointer"
+              aria-label="Back"
+            >
+              <ArrowLeft className="w-5 h-5 stroke-[2.4]" />
+            </button>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Patient Profile</h2>
+              <p className="text-xs text-slate-500 font-medium">Manage medical info & authentication</p>
+            </div>
           </div>
+
+          {/* Logout Action Button in Profile */}
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="px-3.5 py-2.5 rounded-2xl neu-button text-red-600 hover:bg-red-500 hover:text-white flex items-center gap-2 text-xs font-extrabold transition-all cursor-pointer shadow-xs"
+              title="Lock / Sign Out of Portal"
+            >
+              <LogOut className="w-4 h-4 stroke-[2.4]" />
+              <span>Sign Out</span>
+            </button>
+          )}
         </div>
 
         {/* Profile Card / Header Avatar */}
-        <div className="p-4 bg-white border border-slate-200/90 rounded-2xl shadow-2xs mb-5 flex items-center gap-3.5">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-blue-500 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
-            <User className="w-7 h-7" />
+        <div className="p-5 neu-card rounded-3xl mb-6 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-15 h-15 rounded-2xl neu-pressed text-blue-600 flex items-center justify-center shrink-0">
+              <User className="w-8 h-8 stroke-[2.2]" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-900">
+                {formData.name || 'Patient Profile'}
+              </h3>
+              <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>Encrypted & saved on device</span>
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-base font-bold text-slate-900">
-              {formData.name || 'Add Patient Profile'}
-            </h3>
-            <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Offline, saved on device</span>
-            </p>
-          </div>
+
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="hidden sm:flex p-3 rounded-2xl neu-button text-red-600 hover:bg-red-500 hover:text-white transition-all cursor-pointer"
+              title="Logout"
+            >
+              <LogOut className="w-5 h-5 stroke-[2.4]" />
+            </button>
+          )}
         </div>
 
         {/* Form Inputs */}

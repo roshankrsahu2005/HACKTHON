@@ -1,17 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Volume2,
   Mic,
+  MicOff,
   Keyboard,
-  Activity,
   ArrowLeft,
   Stethoscope,
-  HeartPulse,
   Sparkles,
-  CheckCircle2,
-  Pill,
-  Clock,
-  Radio
+  AlertTriangle,
+  RotateCcw,
+  Pill
 } from 'lucide-react';
 import { ScreenId, Language } from '../../types';
 import { playTextToSpeech, stopTextToSpeech } from '../../utils/audio';
@@ -58,8 +56,27 @@ const DOCTOR_TEMPLATES = [
       es: '¿Dónde le duele exactamente más?',
       ar: 'أين يؤلمك بالتحديد أكثر؟',
       fr: 'Où avez-vous le plus mal exactement ?',
-      ur: 'آپ کو بالکل کہاں سب سے زیادہ درد ہو رہا ہے؟',
+      ur: 'آپ کو بالکل کہاں سب से ज्यादा दर्द हो रहा है?',
       en: 'Where exactly does it hurt the most?'
+    }
+  },
+  {
+    id: 'duration',
+    questionEn: 'Since how many hours or days have you had this pain?',
+    questionHi: 'आपको यह दर्द कितने घंटों या दिनों से हो रहा है?',
+    translations: {
+      hi: 'आपको यह दर्द कितने घंटों या दिनों से हो रहा है?',
+      bn: 'কত ঘণ্টা বা দিন ধরে এই ব্যথা হচ্ছে?',
+      ta: 'எத்தனை மணிநேரம் அல்லது நாட்களாக இந்த வலி இருக்கிறது?',
+      te: 'ఎన్ని గంటలు లేదా రోజుల నుండి ఈ నొప్పి వస్తోంది?',
+      mr: 'हा त्रास किती तासांपासून किंवा दिवसांपासून सुरू आहे?',
+      gu: 'આ દુખાવો કેટલા કલાકો કે દિવસોથી છે?',
+      pa: 'ਇਹ ਦਰਦ ਕਿੰਨੇ ਘੰਟਿਆਂ ਜਾਂ ਦਿਨਾਂ ਤੋਂ ਹੈ?',
+      es: '¿Desde cuántas horas o días tiene este dolor?',
+      ar: 'منذ كم ساعة أو يوم تشعر بهذا الألم؟',
+      fr: 'Depuis combien d’heures ou de jours avez-vous cette douleur ?',
+      ur: 'آپ کو یہ درد کتنے گھنٹوں یا دنوں سے ہو رہا ہے؟',
+      en: 'Since how many hours or days have you had this pain?'
     }
   },
   {
@@ -77,8 +94,27 @@ const DOCTOR_TEMPLATES = [
       es: 'Por favor respire hondo. Estamos iniciando el soporte de oxígeno ahora.',
       ar: 'يرجى أخذ أنفاس عميقة. نحن نبدأ دعم الأكسجين الآن.',
       fr: 'Veuillez respirer profondément. Nous commençons l’assistance en oxygène maintenant.',
-      ur: 'براہ کرم گہرے سانس لیں۔ ہم ابھی آکسیجن سپورٹ شروع کر رہے ہیں۔',
+      ur: 'براہ کرم گہرے سانس لیں۔ ہم ابھی آکسیجن سپورٹ शुरू कर रहे हैं।',
       en: 'Please take deep breaths. We are starting oxygen support now.'
+    }
+  },
+  {
+    id: 'history',
+    questionEn: 'Do you have diabetes, high blood pressure or heart problems?',
+    questionHi: 'क्या आपको शुगर (डायबिटीज), बीपी या दिल की बीमारी है?',
+    translations: {
+      hi: 'क्या आपको शुगर (डायबिटीज), बीपी या दिल की बीमारी है?',
+      bn: 'আপনার কি ডায়াবেটিস, হাই বিপি বা হৃদরোগ আছে?',
+      ta: 'உங்களுக்கு சர்க்கரை நோய், உயர் ரத்த அழுத்தம் அல்லது இதய நோய் உள்ளதா?',
+      te: 'మీకు షుగర్, హై బీపీ లేదా గుండె సమస్యలు ఉన్నాయా?',
+      mr: 'तुम्हाला मधुमेह (डायबिटीज), उच्च रक्तदाब किंवा हृदयाचा त्रास आहे का?',
+      gu: 'શું તમને ડાયાબિટીસ, હાઈ બીપી અથવા હૃદયની તકલીફ છે?',
+      pa: 'ਕੀ ਤੁਹਾਨੂੰ ਸ਼ੂਗਰ, ਬੀਪੀ ਜਾਂ ਦਿਲ ਦੀ ਕੋਈ ਬਿਮਾਰੀ ਹੈ?',
+      es: '¿Tiene diabetes, presión alta o problemas cardíacos?',
+      ar: 'هل تعاني من السكري أو ارتفاع ضغط الدم أو مشاكل في القلب؟',
+      fr: 'Avez-vous du diabète, de l’hypertension ou des problèmes cardiaques ?',
+      ur: 'کیا آپ کو ذیابیطس، ہائی بلڈ پریشر یا دل کی بیماری ہے؟',
+      en: 'Do you have diabetes, high blood pressure or heart problems?'
     }
   },
   {
@@ -111,29 +147,77 @@ export const DoctorReplyScreen: React.FC<DoctorReplyScreenProps> = ({
   const [isPlayingPatientAudio, setIsPlayingPatientAudio] = useState(false);
   const [isPlayingDoctorAudio, setIsPlayingDoctorAudio] = useState(false);
   const [isTypingMode, setIsTypingMode] = useState(false);
+  const [recognitionError, setRecognitionError] = useState<string | null>(null);
 
   // Selected template or custom input
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('medicine');
   const [doctorQuestion, setDoctorQuestion] = useState<string>(DOCTOR_TEMPLATES[0].questionEn);
   const [translatedPatientText, setTranslatedPatientText] = useState<string>('');
 
-  // Update translation whenever patientLang or question changes
+  const recognitionRef = useRef<any>(null);
+
+  // Update translation whenever patientLang or doctorQuestion changes
   useEffect(() => {
+    // Check if matching a known template first
     const currentTemplate = DOCTOR_TEMPLATES.find((t) => t.id === selectedTemplateId);
-    if (currentTemplate) {
+    if (currentTemplate && (doctorQuestion === currentTemplate.questionEn || doctorQuestion === currentTemplate.questionHi)) {
       const transMap = currentTemplate.translations as Record<string, string>;
       const match = transMap[patientLang.id] || transMap['hi'] || currentTemplate.questionEn;
       setTranslatedPatientText(match);
-    } else {
-      // Dynamic fallback for custom input
-      setTranslatedPatientText(`(${patientLang.name}): ${doctorQuestion}`);
+      return;
     }
-  }, [patientLang, selectedTemplateId, doctorQuestion]);
+
+    // Dynamic translation via backend API if available
+    let isCancelled = false;
+    if (doctorQuestion.trim()) {
+      fetch('http://localhost:5000/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: doctorQuestion,
+          sourceLang: doctorLang.name,
+          targetLang: patientLang.id
+        })
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && !isCancelled) {
+            const trans = patientLang.id === 'hi' ? data.hindiTranslation : (data.englishTranslation || doctorQuestion);
+            setTranslatedPatientText(trans);
+          }
+        })
+        .catch(() => {
+          // Fallback if backend offline
+          if (!isCancelled) {
+            setTranslatedPatientText(doctorQuestion);
+          }
+        });
+    }
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [patientLang, selectedTemplateId, doctorQuestion, doctorLang]);
+
+  // Clean up speech synthesis & recognition on unmount
+  useEffect(() => {
+    return () => {
+      stopTextToSpeech();
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {
+          // Ignore
+        }
+      }
+    };
+  }, []);
 
   const handleSelectTemplate = (t: typeof DOCTOR_TEMPLATES[0]) => {
     setSelectedTemplateId(t.id);
     const q = doctorLang.id === 'hi' ? t.questionHi : t.questionEn;
     setDoctorQuestion(q);
+    setRecognitionError(null);
   };
 
   const handlePlayPatientAudio = () => {
@@ -142,6 +226,9 @@ export const DoctorReplyScreen: React.FC<DoctorReplyScreenProps> = ({
       setIsPlayingPatientAudio(false);
       return;
     }
+    stopTextToSpeech();
+    setIsPlayingDoctorAudio(false);
+
     playTextToSpeech(
       translatedPatientText,
       patientLang.id,
@@ -156,6 +243,9 @@ export const DoctorReplyScreen: React.FC<DoctorReplyScreenProps> = ({
       setIsPlayingDoctorAudio(false);
       return;
     }
+    stopTextToSpeech();
+    setIsPlayingPatientAudio(false);
+
     playTextToSpeech(
       doctorQuestion,
       doctorLang.id === 'hi' ? 'hi-IN' : 'en-US',
@@ -164,67 +254,176 @@ export const DoctorReplyScreen: React.FC<DoctorReplyScreenProps> = ({
     );
   };
 
+  // Real Web Speech Recognition implementation
   const handleToggleRecord = () => {
     if (isRecording) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {
+          // Ignore
+        }
+      }
       setIsRecording(false);
-    } else {
-      setIsRecording(true);
-      setTimeout(() => {
+      return;
+    }
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setRecognitionError('Speech recognition is not supported in this browser. Please use keyboard typing mode.');
+      setIsTypingMode(true);
+      return;
+    }
+
+    try {
+      setRecognitionError(null);
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+
+      // Set language code based on doctor's selected language
+      const langCodeMap: Record<string, string> = {
+        hi: 'hi-IN',
+        en: 'en-US',
+        bn: 'bn-IN',
+        ta: 'ta-IN',
+        te: 'te-IN',
+        mr: 'mr-IN',
+        gu: 'gu-IN',
+        pa: 'pa-IN',
+        es: 'es-ES',
+        ar: 'ar-SA',
+        fr: 'fr-FR',
+        ur: 'ur-PK'
+      };
+
+      recognition.lang = langCodeMap[doctorLang.id] || 'en-US';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        setIsRecording(true);
+        stopTextToSpeech();
+        setIsPlayingPatientAudio(false);
+        setIsPlayingDoctorAudio(false);
+      };
+
+      recognition.onresult = (event: any) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        if (transcript.trim()) {
+          setDoctorQuestion(transcript);
+          setSelectedTemplateId('');
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Doctor speech recognition error:', event.error);
+        if (event.error === 'not-allowed') {
+          setRecognitionError('Microphone permission denied. Please allow microphone access or use keyboard typing.');
+        } else if (event.error !== 'no-speech') {
+          setRecognitionError(`Speech recognition: ${event.error}. You can type below.`);
+        }
         setIsRecording(false);
-      }, 2500);
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognition.start();
+    } catch (err) {
+      console.error('Failed to start SpeechRecognition:', err);
+      setRecognitionError('Unable to activate microphone. Please type your message.');
+      setIsRecording(false);
+      setIsTypingMode(true);
     }
   };
 
+  const handleClearQuestion = () => {
+    setDoctorQuestion('');
+    setTranslatedPatientText('');
+    setSelectedTemplateId('');
+  };
+
   return (
-    <div className="flex flex-col justify-between h-full min-h-[640px] p-4 sm:p-5 bg-slate-50 relative overflow-y-auto">
-      <div>
-        {/* Web Tool Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-200">
+    <div className="flex flex-col justify-between h-full min-h-[640px] p-5 sm:p-8 bg-[#eef3fa] text-slate-800 relative overflow-y-auto rounded-3xl">
+      <div className="space-y-5">
+        {/* Top Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
-                Doctor Clinical Response
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <span>Doctor Clinical Response</span>
+                <Stethoscope className="w-5 h-5 text-blue-600 stroke-[2.4]" />
               </h2>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
-                Clinician Portal
+              <span className="px-3 py-1 rounded-full text-xs font-black neu-pill text-blue-700 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                <span>Clinician Mode</span>
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Doctor speaks in <span className="font-bold text-slate-700">{doctorLang.name}</span> &rarr; renders translated voice for Patient in <span className="font-bold text-blue-700">{patientLang.name} ({patientLang.nativeName})</span>.
+            <p className="text-xs text-slate-500 font-medium mt-1">
+              Speak or type in <span className="font-extrabold text-slate-800">{doctorLang.name}</span> &rarr; renders translated voice for Patient in <span className="font-extrabold text-blue-700">{patientLang.name} ({patientLang.nativeName})</span>.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => onNavigate('patient_translation')}
-              className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+              className="px-4 py-2 rounded-2xl neu-button text-xs font-extrabold text-slate-800 hover:text-slate-900 flex items-center gap-2 cursor-pointer transition-all"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back to Patient Speech</span>
+              <ArrowLeft className="w-4 h-4 stroke-[2.4]" />
+              <span>Patient Translation</span>
             </button>
           </div>
         </div>
 
-        {/* Quick Clinical Doctor Questions (One-Tap Pills) */}
-        <div className="mb-4">
-          <span className="text-xs font-bold text-slate-600 mb-1.5 block">
-            Rapid Doctor Inquiries (Quick Clinical Commands):
-          </span>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {/* Microphone Error Alert (if any) */}
+        {recognitionError && (
+          <div className="p-3.5 neu-card border border-amber-400 bg-amber-50/70 rounded-2xl text-xs font-bold text-amber-900 flex items-center gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="flex-1">{recognitionError}</span>
+            <button
+              type="button"
+              onClick={() => setRecognitionError(null)}
+              className="text-[11px] underline cursor-pointer font-bold"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {/* Rapid Doctor Inquiries (Quick Clinical Commands) */}
+        <div className="p-4 neu-card rounded-3xl space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-slate-800 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-500 stroke-[2.4]" />
+              <span>Rapid Doctor Inquiries (1-Click Clinical Templates)</span>
+            </span>
+            <span className="text-[10px] font-bold text-slate-400">
+              Tap any inquiry
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
             {DOCTOR_TEMPLATES.map((t) => {
               const isSelected = selectedTemplateId === t.id;
               return (
                 <button
                   key={t.id}
                   onClick={() => handleSelectTemplate(t)}
-                  className={`text-left p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                  className={`text-left p-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                      : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                      ? 'neu-pressed border-2 border-blue-600 text-blue-900 font-extrabold scale-[1.01]'
+                      : 'neu-button text-slate-700 hover:text-slate-900'
                   }`}
                 >
-                  <p className="line-clamp-2">{doctorLang.id === 'hi' ? t.questionHi : t.questionEn}</p>
+                  <p className="line-clamp-2 leading-relaxed">
+                    {doctorLang.id === 'hi' ? t.questionHi : t.questionEn}
+                  </p>
                 </button>
               );
             })}
@@ -232,146 +431,205 @@ export const DoctorReplyScreen: React.FC<DoctorReplyScreenProps> = ({
         </div>
 
         {/* Doctor Input Card */}
-        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs mb-3">
-          <div className="flex items-center justify-between text-xs text-slate-500 mb-2 pb-1.5 border-b border-slate-100">
-            <span className="font-bold text-slate-700 flex items-center gap-1.5">
-              <span>{doctorLang.flag}</span>
-              <span>Doctor Input ({doctorLang.name})</span>
+        <div className="p-5 neu-card rounded-3xl space-y-4">
+          <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200/60">
+            <span className="font-extrabold text-slate-900 text-xs flex items-center gap-2">
+              <span className="text-xl">{doctorLang.flag}</span>
+              <span>Doctor Question ({doctorLang.name})</span>
             </span>
-            <button
-              onClick={handlePlayDoctorAudio}
-              className={`p-1 rounded-md transition-colors cursor-pointer ${
-                isPlayingDoctorAudio ? 'text-blue-600 animate-pulse' : 'text-slate-400 hover:text-slate-600'
-              }`}
-              title="Play question audio"
-            >
-              <Volume2 className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              {doctorQuestion && (
+                <button
+                  type="button"
+                  onClick={handleClearQuestion}
+                  className="p-1.5 rounded-xl neu-button text-slate-500 hover:text-red-600 transition-all cursor-pointer text-xs"
+                  title="Clear question"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setIsTypingMode(!isTypingMode)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  isTypingMode
+                    ? 'neu-pressed text-blue-900 border border-blue-500'
+                    : 'neu-button text-slate-700 hover:text-slate-900'
+                }`}
+              >
+                <Keyboard className="w-3.5 h-3.5" />
+                <span>{isTypingMode ? 'Voice Mode' : 'Type Mode'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePlayDoctorAudio}
+                className={`p-2 rounded-xl neu-button text-blue-700 hover:text-blue-900 transition-all cursor-pointer ${
+                  isPlayingDoctorAudio ? 'neu-button-primary text-white animate-pulse' : ''
+                }`}
+                title="Play doctor audio"
+              >
+                <Volume2 className="w-4 h-4 stroke-[2.4]" />
+              </button>
+            </div>
           </div>
 
           {isTypingMode ? (
-            <textarea
-              value={doctorQuestion}
-              onChange={(e) => {
-                setDoctorQuestion(e.target.value);
-                setSelectedTemplateId('');
-              }}
-              rows={2}
-              className="w-full text-base font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 rounded-xl p-2 border border-slate-200 resize-none leading-relaxed"
-              placeholder="Type doctor's inquiry..."
-            />
+            <div className="space-y-2">
+              <textarea
+                value={doctorQuestion}
+                onChange={(e) => {
+                  setDoctorQuestion(e.target.value);
+                  setSelectedTemplateId('');
+                }}
+                rows={2}
+                className="w-full p-4 neu-input text-base font-bold resize-none leading-relaxed"
+                placeholder={`Type doctor's inquiry in ${doctorLang.name}...`}
+              />
+            </div>
           ) : (
-            <div className="text-base sm:text-lg font-bold text-slate-900 leading-relaxed min-h-[50px] flex items-center py-1">
-              "{doctorQuestion}"
+            <div className="p-4 neu-pressed rounded-2xl min-h-[64px] flex items-center">
+              <p className="text-base sm:text-lg font-black text-slate-900 leading-relaxed">
+                {doctorQuestion ? `"${doctorQuestion}"` : <span className="text-slate-400 font-normal italic">Tap the microphone below to speak or select a quick inquiry above...</span>}
+              </p>
             </div>
           )}
 
           {/* Audio Waveform Graphic */}
-          <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-2">
-            <div className="flex items-center gap-1">
-              {[30, 60, 85, 45, 95, 40, 70, 50, 30].map((h, i) => (
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center gap-1.5 neu-pressed px-3 py-2 rounded-xl">
+              {[30, 60, 85, 45, 95, 40, 70, 50, 30, 65, 90, 40].map((h, i) => (
                 <span
                   key={i}
                   style={{ height: isRecording ? `${h}%` : `${Math.max(20, h * 0.4)}%` }}
                   className={`w-1 rounded-full transition-all duration-150 ${
-                    isRecording ? 'bg-blue-600 animate-pulse' : 'bg-slate-300'
+                    isRecording
+                      ? 'bg-gradient-to-t from-red-600 to-rose-500 animate-pulse'
+                      : 'bg-slate-400'
                   }`}
                 />
               ))}
             </div>
-            <span className="text-[11px] text-slate-400 font-mono">00:03</span>
-          </div>
-        </div>
-
-        {/* Center Mic Action Section */}
-        <div className="flex items-center justify-center my-3">
-          <div className="flex flex-col items-center">
-            <div className="relative flex items-center justify-center">
-              {isRecording && (
-                <>
-                  <div className="absolute w-24 h-24 rounded-full bg-blue-500/25 animate-ping pointer-events-none" />
-                  <div className="absolute w-28 h-28 rounded-full bg-blue-500/15 animate-pulse pointer-events-none" />
-                </>
-              )}
-
-              <button
-                onClick={handleToggleRecord}
-                className={`w-16 h-16 rounded-full flex items-center justify-center text-white shadow-xl transition-transform active:scale-95 cursor-pointer ${
-                  isRecording
-                    ? 'bg-red-600 shadow-red-600/35 ring-4 ring-red-200'
-                    : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30'
-                }`}
-                title="Tap to speak"
-              >
-                <Mic className="w-8 h-8" />
-              </button>
-            </div>
-
-            <span className="text-xs font-bold text-slate-700 mt-2">
-              {isRecording ? 'Listening Doctor Voice...' : `Tap to Speak (${doctorLang.name})`}
+            <span className="text-[11px] font-mono neu-pill px-3 py-1 font-extrabold text-slate-600">
+              {isRecording ? '🔴 LISTENING DOCTOR...' : 'STANDBY'}
             </span>
           </div>
         </div>
 
+        {/* Central Speak Action & Microphone Button */}
+        <div className="flex flex-col items-center justify-center py-2 space-y-2">
+          <div className="relative flex items-center justify-center">
+            {isRecording && (
+              <>
+                <div className="absolute w-28 h-28 rounded-full bg-red-500/20 animate-ping pointer-events-none" />
+                <div className="absolute w-32 h-32 rounded-full bg-blue-500/15 animate-pulse pointer-events-none" />
+              </>
+            )}
+
+            <button
+              type="button"
+              onClick={handleToggleRecord}
+              className={`w-20 h-20 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xl ${
+                isRecording
+                  ? 'neu-button-emergency ring-4 ring-red-300 scale-105 animate-pulse'
+                  : 'neu-button-primary hover:scale-105 active:scale-95'
+              }`}
+              title={isRecording ? 'Tap to Stop Listening' : 'Tap to Speak'}
+            >
+              {isRecording ? (
+                <MicOff className="w-9 h-9 text-white" />
+              ) : (
+                <Mic className="w-9 h-9 text-white" />
+              )}
+            </button>
+          </div>
+
+          <div className="text-center space-y-0.5">
+            <h4 className="text-xs font-black text-slate-900">
+              {isRecording ? '🎙️ Listening doctor speech (Tap to finish)...' : `Tap Mic to Speak in ${doctorLang.name}`}
+            </h4>
+            <p className="text-[11px] text-slate-500 font-medium">
+              Instant translation rendering into {patientLang.name} ({patientLang.nativeName})
+            </p>
+          </div>
+        </div>
+
         {/* Translated Output Card for the Patient */}
-        <div className="p-4 bg-emerald-50/80 border border-emerald-300/80 rounded-2xl shadow-xs mt-2">
-          <div className="flex items-center justify-between text-xs text-emerald-900 font-bold mb-2 pb-1.5 border-b border-emerald-200">
-            <div className="flex items-center gap-1.5">
-              <span>{patientLang.flag}</span>
+        <div className="p-5 neu-card rounded-3xl space-y-3 border-l-4 border-l-emerald-600">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200/60">
+            <div className="flex items-center gap-2 text-emerald-800 font-black text-xs sm:text-sm">
+              <span className="text-xl">{patientLang.flag}</span>
               <span>
                 Translated for Patient in {patientLang.name} ({patientLang.nativeName})
               </span>
             </div>
 
             <button
+              type="button"
               onClick={handlePlayPatientAudio}
-              className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
                 isPlayingPatientAudio
-                  ? 'bg-emerald-600 text-white animate-pulse shadow-xs'
-                  : 'bg-white text-emerald-800 border border-emerald-300 hover:bg-emerald-100'
+                  ? 'neu-button-primary animate-pulse'
+                  : 'neu-button text-emerald-700 hover:text-emerald-900'
               }`}
-              title="Play Patient Audio"
             >
-              <Volume2 className="w-3.5 h-3.5" />
-              <span>{isPlayingPatientAudio ? 'Playing...' : 'Speak to Patient'}</span>
+              <Volume2 className="w-4 h-4 stroke-[2.4]" />
+              <span>{isPlayingPatientAudio ? 'Speaking to Patient...' : 'Speak to Patient'}</span>
             </button>
           </div>
 
-          <p className="text-slate-950 font-bold text-base sm:text-lg leading-snug">
-            {translatedPatientText}
-          </p>
+          <div className="p-4 neu-pressed rounded-2xl">
+            <p className="text-slate-900 font-black text-base sm:text-xl leading-relaxed">
+              {translatedPatientText || (
+                <span className="text-slate-400 font-normal italic">
+                  Translation will appear here instantly...
+                </span>
+              )}
+            </p>
+          </div>
         </div>
 
-        {/* Doctor Quick Prescriptions / Guidance Quick Link */}
-        <div className="mt-3 p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between shadow-2xs">
-          <div className="text-xs text-slate-600">
-            <span className="font-bold text-slate-800">Need to prescribe medication?</span>
-            <div className="text-[11px] text-slate-400">
-              Provide tablet, syrup & dosage schedule in patient's language
+        {/* Doctor Quick Prescriptions / Guidance Link */}
+        <div className="p-4 neu-card rounded-3xl flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl neu-pressed flex items-center justify-center text-blue-600">
+              <Pill className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="font-extrabold text-slate-900 text-xs block">
+                Need to prescribe medication?
+              </span>
+              <p className="text-[11px] text-slate-500 font-medium">
+                Translate dosage schedules & tablet instructions into patient's language
+              </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={() => onNavigate('medicine')}
-            className="px-3 py-1.5 bg-blue-50 text-blue-700 font-bold rounded-lg text-xs hover:bg-blue-100 transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-2xl neu-button-primary text-xs font-extrabold transition-all cursor-pointer shrink-0"
           >
             Dosage &rarr;
           </button>
         </div>
       </div>
 
-      {/* Navigation Shortcuts Bar at Screen Bottom */}
-      <div className="pt-4 flex items-center justify-between gap-2 border-t border-slate-200 mt-4">
+      {/* Bottom Navigation Actions Bar */}
+      <div className="pt-6 mt-6 border-t border-slate-200/60 flex flex-wrap items-center justify-between gap-3">
         <button
+          type="button"
           onClick={() => onNavigate('patient_translation')}
-          className="flex-1 py-2 px-3 bg-white border border-slate-200 hover:border-blue-400 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+          className="flex-1 py-3 px-4 rounded-2xl neu-button text-xs font-extrabold text-slate-800 hover:text-slate-900 transition-all cursor-pointer flex items-center justify-center gap-2"
         >
           <span>&larr; Patient Translation</span>
         </button>
         <button
+          type="button"
           onClick={() => onNavigate('history')}
-          className="py-2 px-3 bg-white border border-slate-200 hover:border-blue-400 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+          className="py-3 px-4 rounded-2xl neu-button text-xs font-extrabold text-slate-800 hover:text-slate-900 transition-all cursor-pointer flex items-center justify-center gap-2"
         >
-          <span>History</span>
+          <span>Consultation History</span>
         </button>
       </div>
     </div>

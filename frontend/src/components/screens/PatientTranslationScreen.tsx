@@ -7,15 +7,15 @@ import {
   Activity,
   AlertTriangle,
   ArrowRight,
-  RefreshCw,
   Sparkles,
   Bot,
   ShieldAlert,
   Stethoscope,
-  Radio,
   CheckCircle2,
   Globe2,
-  Zap
+  Zap,
+  RotateCcw,
+  Trash2
 } from 'lucide-react';
 import { ScreenId, Language } from '../../types';
 import { playTextToSpeech, stopTextToSpeech } from '../../utils/audio';
@@ -26,7 +26,7 @@ import {
   EmergencyPreset
 } from '../../utils/aiTranslator';
 import { LANGUAGES } from '../../data/mockData';
-import { syncTranslationToSupabase } from '../../utils/supabase';
+import { syncTranslationToSupabase, syncConsultationToSupabase } from '../../utils/supabase';
 
 interface PatientTranslationScreenProps {
   onNavigate: (screen: ScreenId) => void;
@@ -66,27 +66,79 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
   // Speech Recognition ref
   const recognitionRef = useRef<any>(null);
 
-  // Re-run analysis whenever input text or doctor's output language changes
+  // Clean up audio on unmount
   useEffect(() => {
-    const result = processPatientSpeech(inputText, doctorOutputLangId);
-    setAnalysis(result);
+    return () => {
+      stopTextToSpeech();
+    };
+  }, []);
+
+  // Re-run analysis & query backend API whenever input text or doctor output language changes
+  useEffect(() => {
+    // 1. Instant local NLP processing for zero latency
+    const localResult = processPatientSpeech(inputText, doctorOutputLangId);
+    setAnalysis(localResult);
 
     // If auto-detect is on, sync detected language with app-wide state
     if (isAutoDetectMode && onSelectPatientLang) {
-      if (result.detectedLanguage.id !== patientLang.id) {
-        onSelectPatientLang(result.detectedLanguage);
+      if (localResult.detectedLanguage.id !== patientLang.id) {
+        onSelectPatientLang(localResult.detectedLanguage);
       }
     }
 
-    // Cloud sync to Supabase (if connected)
+    // 2. Fetch live backend AI server translation if backend is running
+    let isCancelled = false;
     if (inputText.trim()) {
+      fetch('http://localhost:5000/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: inputText,
+          sourceLang: localResult.detectedLanguage.name,
+          targetLang: doctorOutputLangId
+        })
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((backendResult) => {
+          if (backendResult && !isCancelled) {
+            setAnalysis((prev) => ({
+              ...prev,
+              englishTranslation: backendResult.englishTranslation || prev.englishTranslation,
+              hindiTranslation: backendResult.hindiTranslation || prev.hindiTranslation,
+              doctorTranslation:
+                doctorOutputLangId === 'hi'
+                  ? backendResult.hindiTranslation || prev.hindiTranslation
+                  : backendResult.englishTranslation || prev.englishTranslation,
+              triageLevel: backendResult.triageLevel || prev.triageLevel,
+              clinicalSummary: backendResult.clinicalSummary || prev.clinicalSummary,
+              requiresImmediateSOS: backendResult.requiresImmediateSOS ?? prev.requiresImmediateSOS
+            }));
+          }
+        })
+        .catch(() => {
+          // Silent fallback to local NLP engine
+        });
+
+      // Cloud sync to Supabase Realtime consultations table
+      syncConsultationToSupabase({
+        patient_id: 'P-' + Math.floor(1000 + Math.random() * 9000),
+        patient_name: 'Walk-in Patient',
+        source_text: inputText,
+        detected_language: localResult.detectedLanguage.name,
+        translated_text: localResult.doctorTranslation,
+        triage_level: localResult.triageLevel,
+        critical_symptoms: localResult.criticalSymptoms,
+        clinical_summary: localResult.clinicalSummary
+      });
+
+      // Cloud sync to Supabase translation_logs table
       syncTranslationToSupabase(
         'patient',
-        result.detectedLanguage.name,
+        localResult.detectedLanguage.name,
         doctorOutputLangId === 'hi' ? 'Hindi' : 'English',
         inputText,
-        result.doctorTranslation,
-        result.triageLevel
+        localResult.doctorTranslation,
+        localResult.triageLevel
       );
     }
   }, [inputText, doctorOutputLangId, isAutoDetectMode]);
@@ -159,12 +211,11 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
         recognitionRef.current = recognition;
         recognition.continuous = false;
         recognition.interimResults = true;
-        // In auto-detect mode, let browser use default locale or patient locale
-        recognition.lang = isAutoDetectMode ? '' : patientLang.id;
+        recognition.lang = isAutoDetectMode ? '' : patientLang.id === 'hi' ? 'hi-IN' : 'en-US';
 
         recognition.onresult = (event: any) => {
           let transcript = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
+          for (let i = 0; i < event.results.length; i++) {
             transcript += event.results[i][0].transcript;
           }
           if (transcript.trim()) {
@@ -174,8 +225,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
         };
 
         recognition.onerror = (event: any) => {
-          console.warn('Speech recognition error/blocked:', event.error);
-          setRecognitionError('Microphone audio completed');
+          console.warn('Speech recognition notice:', event.error);
           setIsRecording(false);
         };
 
@@ -186,7 +236,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
         recognition.start();
         return;
       } catch (err) {
-        console.warn('Speech recognition launch failed, using fallback simulation:', err);
+        console.warn('Speech recognition launch fallback:', err);
       }
     }
 
@@ -197,133 +247,148 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
   };
 
   return (
-    <div className="flex flex-col justify-between h-full min-h-[680px] p-4 sm:p-5 bg-slate-50 relative overflow-y-auto">
-      <div>
-        {/* Header Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-200">
+    <div className="flex flex-col justify-between h-full min-h-[640px] p-5 sm:p-8 bg-[#eef3fa] relative overflow-y-auto rounded-3xl">
+      <div className="space-y-6">
+        {/* Top Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
-                Patient Speech Translation
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <span>Patient Translation</span>
+                <Mic className="w-5 h-5 text-blue-600 stroke-[2.4]" />
               </h2>
-              {/* AI Auto-Detect Active Badge */}
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs">
-                <Sparkles className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '4s' }} />
-                <span>AI Auto-Detect Active</span>
+              <span className="px-3 py-1 rounded-full text-xs font-black neu-pill text-blue-700 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-blue-600 animate-spin" style={{ animationDuration: '4s' }} />
+                <span>AI Auto-Detect</span>
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Emergency Mode: Patient speaks in <span className="font-semibold text-slate-700">ANY language</span> — AI auto-detects & renders clinical translation for the Doctor.
+            <p className="text-xs text-slate-500 font-medium mt-1">
+              Patient speaks in Indian regional languages — AI auto-detects & translates live for Doctor
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => onNavigate('doctor_reply')}
-              className="px-3.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+              className="px-4 py-2 rounded-2xl neu-button-primary text-xs font-extrabold flex items-center gap-2 cursor-pointer"
             >
               <span>Doctor Reply</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ArrowRight className="w-4 h-4 stroke-[2.4]" />
             </button>
           </div>
         </div>
 
-        {/* Emergency Triage Notice & Auto-Detect Banner */}
-        <div className="p-3 bg-gradient-to-r from-blue-50 via-indigo-50 to-sky-50 border border-blue-200/80 rounded-2xl mb-4 shadow-2xs">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                <Bot className="w-4 h-4" />
+        {/* AI Zero-Click Auto-Detect Mode Banner */}
+        <div className="p-4 neu-card rounded-3xl">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl neu-raised text-blue-600 flex items-center justify-center shrink-0">
+                <Bot className="w-5 h-5 stroke-[2.4]" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-900">
+                  <span className="text-xs font-black text-slate-900">
                     Emergency Zero-Click AI Detection
                   </span>
-                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-md">
-                    No Manual Selection Needed
+                  <span className="text-[10px] neu-pill px-2 py-0.5 font-extrabold text-emerald-700">
+                    Instant Auto-Match
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-600">
-                  Doctor or patient doesn't need to waste time searching language dropdowns in critical moments.
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Zero setup time — Patient speaks naturally in any Indian language.
                 </p>
               </div>
             </div>
 
-            {/* Auto-detect toggle switch */}
-            <div className="flex items-center gap-1.5 self-end sm:self-center">
+            <div className="flex items-center gap-2 self-end sm:self-center">
               <button
+                type="button"
                 onClick={() => setIsAutoDetectMode(true)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   isAutoDetectMode
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                    ? 'neu-pressed text-blue-900 border-2 border-blue-600'
+                    : 'neu-button text-slate-700 hover:text-slate-900'
                 }`}
               >
-                <Zap className="w-3 h-3" />
+                <Zap className="w-3.5 h-3.5 text-blue-600" />
                 <span>Auto-Detect</span>
               </button>
               <button
-                onClick={() => onNavigate('languages')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                type="button"
+                onClick={() => {
+                  setIsAutoDetectMode(false);
+                  onNavigate('languages');
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   !isAutoDetectMode
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                    ? 'neu-pressed text-blue-900 border-2 border-blue-600'
+                    : 'neu-button text-slate-700 hover:text-slate-900'
                 }`}
-                title="Change manually in languages menu"
               >
-                <Globe2 className="w-3 h-3" />
-                <span>Manual</span>
+                <Globe2 className="w-3.5 h-3.5 text-slate-600" />
+                <span>Manual Select</span>
               </button>
             </div>
           </div>
         </div>
 
         {/* PATIENT VOICE INPUT CARD */}
-        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs mb-3 relative">
-          <div className="flex flex-wrap items-center justify-between text-xs mb-2.5 gap-2 pb-2 border-b border-slate-100">
-            {/* Auto-Detected Language Pill */}
-            <div className="flex items-center gap-2">
-              <span className="text-base">{analysis.detectedLanguage.flag}</span>
+        <div className="p-5 neu-card rounded-3xl space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/60">
+            <div className="flex items-center gap-2.5">
+              <span className="text-2xl">{analysis.detectedLanguage.flag}</span>
               <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-slate-900 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-slate-900 text-sm">
                     {analysis.detectedLanguage.name} ({analysis.detectedLanguage.nativeName})
                   </span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black neu-pill text-emerald-700 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                     <span>{analysis.confidence}% Match</span>
                   </span>
                 </div>
-                <span className="text-[10px] text-slate-400">
-                  Script: {analysis.sourceScript} • Patient Voice Input
+                <span className="text-[10px] text-slate-500 font-medium">
+                  Script: {analysis.sourceScript} • Live Patient Audio Stream
                 </span>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 text-blue-600 text-xs font-semibold">
-                <Activity className={`w-3.5 h-3.5 ${isRecording ? 'animate-bounce' : ''}`} />
-                <span>{isRecording ? 'Listening live...' : 'Voice input active'}</span>
+              <div className="flex items-center gap-1.5 neu-pill px-3 py-1 text-blue-700 text-xs font-extrabold">
+                <Activity className={`w-3.5 h-3.5 ${isRecording ? 'animate-bounce text-red-600' : 'text-blue-600'}`} />
+                <span>{isRecording ? 'Listening live...' : 'Voice Stream Active'}</span>
               </div>
 
-              {/* Type Mode Toggle */}
+              {inputText.trim() && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInputText('');
+                    setActivePresetId('');
+                  }}
+                  className="p-1.5 rounded-xl neu-button text-slate-500 hover:text-red-600 transition-all cursor-pointer"
+                  title="Clear patient input"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              )}
+
               <button
+                type="button"
                 onClick={() => setIsTypingMode(!isTypingMode)}
-                className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                   isTypingMode
-                    ? 'bg-blue-50 border-blue-300 text-blue-700'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    ? 'neu-pressed text-blue-900 border border-blue-500'
+                    : 'neu-button text-slate-700 hover:text-slate-900'
                 }`}
-                title="Toggle manual text edit"
               >
                 <Keyboard className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{isTypingMode ? 'Voice Mode' : 'Type'}</span>
+                <span>{isTypingMode ? 'Voice Mode' : 'Keyboard'}</span>
               </button>
             </div>
           </div>
 
-          {/* Text input area */}
+          {/* Input text or Speech Display */}
           {isTypingMode ? (
             <textarea
               value={inputText}
@@ -332,98 +397,102 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
                 setActivePresetId('');
               }}
               rows={3}
-              className="w-full text-base font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 rounded-xl p-2 border border-slate-200 resize-none leading-relaxed"
-              placeholder="Speak or type patient symptoms in Hindi, Bengali, Tamil, Telugu, Spanish, Arabic, or any language..."
+              className="w-full p-4 neu-input text-base font-bold resize-none leading-relaxed focus:ring-2 focus:ring-blue-500/30"
+              placeholder="Type patient symptoms in Hindi, Bengali, Tamil, Telugu, Marathi, or any Indian language..."
             />
           ) : (
-            <div className="text-base sm:text-lg font-bold text-slate-900 leading-relaxed min-h-[56px] flex items-center py-1">
-              "{inputText}"
+            <div className="p-4 neu-pressed rounded-2xl min-h-[72px] flex items-center justify-between gap-3">
+              <p className="text-base sm:text-lg font-black text-slate-900 leading-relaxed">
+                {inputText ? `"${inputText}"` : <span className="text-slate-400 font-normal italic">Tap Mic below or switch to Keyboard mode to enter symptoms...</span>}
+              </p>
             </div>
           )}
 
-          {/* Waveform Graphic */}
-          <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-2">
-            <div className="flex items-center gap-1">
-              {[30, 60, 95, 45, 80, 25, 90, 50, 75, 35, 85, 40].map((h, i) => (
+          {/* Audio Telemetry Waveform */}
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-1.5 neu-pressed px-3 py-2 rounded-xl">
+              {[30, 65, 95, 45, 80, 25, 90, 50, 75, 35, 85, 40, 60, 90, 45].map((h, i) => (
                 <span
                   key={i}
                   style={{
                     height: isRecording
-                      ? `${Math.max(25, (h + (i % 3) * 15) % 100)}px`
+                      ? `${Math.max(20, (h + (i % 3) * 20) % 100)}px`
                       : '8px'
                   }}
                   className={`w-1 rounded-full transition-all duration-150 ${
                     isRecording
                       ? 'bg-gradient-to-t from-blue-600 to-indigo-500 animate-pulse'
-                      : 'bg-slate-300'
+                      : 'bg-slate-400'
                   }`}
                 />
               ))}
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-slate-400 font-mono">
-                {isRecording ? '🔴 REC 00:03' : 'Ready'}
-              </span>
-            </div>
+            <span className="text-[11px] font-mono neu-pill px-3 py-1 font-extrabold text-slate-600">
+              {isRecording ? '🔴 REC LIVE' : 'MIC STANDBY'}
+            </span>
           </div>
         </div>
 
-        {/* Central Speak Action & Microphone */}
-        <div className="flex items-center justify-center my-3">
-          <div className="flex flex-col items-center">
-            <div className="relative flex items-center justify-center">
-              {isRecording && (
-                <>
-                  <div className="absolute w-24 h-24 rounded-full bg-red-500/25 animate-ping pointer-events-none" />
-                  <div className="absolute w-28 h-28 rounded-full bg-blue-500/20 animate-pulse pointer-events-none" />
-                </>
+        {/* CENTRAL NEUMORPHIC MIC RECORDING BUTTON */}
+        <div className="flex flex-col items-center justify-center py-2 space-y-2">
+          <div className="relative flex items-center justify-center">
+            {isRecording && (
+              <>
+                <div className="absolute w-28 h-28 rounded-full bg-red-500/20 animate-ping pointer-events-none" />
+                <div className="absolute w-32 h-32 rounded-full bg-blue-500/15 animate-pulse pointer-events-none" />
+              </>
+            )}
+
+            <button
+              type="button"
+              onClick={handleToggleRecord}
+              className={`w-20 h-20 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xl ${
+                isRecording
+                  ? 'neu-button-emergency ring-4 ring-red-300 scale-105'
+                  : 'neu-button-primary'
+              }`}
+              title={isRecording ? 'Stop listening' : 'Tap to speak in any language'}
+            >
+              {isRecording ? (
+                <MicOff className="w-9 h-9 text-white animate-pulse" />
+              ) : (
+                <Mic className="w-9 h-9 text-white" />
               )}
+            </button>
+          </div>
 
-              <button
-                onClick={handleToggleRecord}
-                className={`w-16 h-16 sm:w-18 sm:h-18 rounded-full flex items-center justify-center text-white shadow-xl transition-all active:scale-95 cursor-pointer ${
-                  isRecording
-                    ? 'bg-red-600 shadow-red-600/40 ring-4 ring-red-200'
-                    : 'bg-gradient-to-tr from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-600/30'
-                }`}
-                title={isRecording ? 'Click to stop listening' : 'Tap to speak in ANY language'}
-              >
-                {isRecording ? <MicOff className="w-8 h-8 animate-pulse" /> : <Mic className="w-8 h-8" />}
-              </button>
-            </div>
-
-            <span className="text-xs font-bold text-slate-700 mt-2 text-center">
-              {isRecording
-                ? '🎙️ Listening... Speak in Hindi, Bengali, Tamil, Telugu or any language'
-                : `Tap Mic to Speak in Any Language`}
-            </span>
-            <span className="text-[10px] text-slate-400">
-              AI automatically detects spoken language and translates immediately
-            </span>
+          <div className="text-center space-y-0.5">
+            <h4 className="text-xs font-black text-slate-900">
+              {isRecording ? '🎙️ Recording Patient Speech...' : 'Tap Mic to Speak in Any Indian Language'}
+            </h4>
+            <p className="text-[11px] text-slate-500 font-medium">
+              Real-time clinical NLP & triage severity detection
+            </p>
           </div>
         </div>
 
-        {/* EMERGENCY SCENARIO PRESETS: Quick One-Tap Testing */}
-        <div className="my-3">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 text-amber-500" />
-              <span>Simulate Emergency Patient Speech (1-Tap Test):</span>
+        {/* 1-TAP EMERGENCY SPEECH PRESETS */}
+        <div className="p-4 neu-card rounded-3xl space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-slate-800 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-500 stroke-[2.4]" />
+              <span>Simulate Emergency Patient Speech (1-Tap Test)</span>
             </span>
-            <span className="text-[11px] text-slate-400">Tap to test AI Auto-Detection</span>
+            <span className="text-[10px] neu-pill px-2.5 py-0.5 text-slate-500 font-extrabold">Quick Test</span>
           </div>
 
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+          <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none">
             {EMERGENCY_PRESETS.map((preset) => {
               const isSelected = activePresetId === preset.id;
               return (
                 <button
                   key={preset.id}
+                  type="button"
                   onClick={() => handleSelectPreset(preset)}
-                  className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer ${
+                  className={`shrink-0 px-3.5 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                      : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                      ? 'neu-pressed border-2 border-blue-600 text-blue-900'
+                      : 'neu-button text-slate-700 hover:text-slate-900'
                   }`}
                 >
                   <span>{preset.flag}</span>
@@ -434,111 +503,112 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
           </div>
         </div>
 
-        {/* DOCTOR TRANSLATION DISPLAY CARD */}
-        <div className="p-4 bg-gradient-to-br from-sky-50/90 to-blue-50/70 border border-sky-200 rounded-2xl shadow-xs mt-2">
-          <div className="flex items-center justify-between text-xs text-sky-900 font-bold mb-2 pb-1.5 border-b border-sky-200/60">
-            <div className="flex items-center gap-2">
-              <Stethoscope className="w-4 h-4 text-blue-600" />
+        {/* DOCTOR TRANSLATED OUTPUT CARD */}
+        <div className="p-5 neu-card rounded-3xl space-y-3.5 border-l-4 border-l-blue-600">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-200/60">
+            <div className="flex items-center gap-2 text-blue-700 font-black text-sm">
+              <Stethoscope className="w-4 h-4 stroke-[2.4]" />
               <span>
                 Translated Output ({doctorOutputLangId === 'hi' ? 'हिन्दी - Hindi' : 'English'})
               </span>
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Compact Doctor language switch inside the output card */}
-              <div className="inline-flex p-0.5 bg-white rounded-lg border border-sky-200 shadow-2xs">
+              {/* Language Switch Pills */}
+              <div className="flex items-center gap-1 neu-pressed p-1 rounded-xl">
                 <button
+                  type="button"
                   onClick={() => handleToggleDoctorLang('en')}
-                  className={`px-2 py-0.5 text-[11px] font-bold rounded-md transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 text-xs font-extrabold rounded-lg transition-all cursor-pointer ${
                     doctorOutputLangId === 'en'
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'neu-pill text-blue-700 font-black'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
-                  title="Show in English"
                 >
                   🇬🇧 English
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleToggleDoctorLang('hi')}
-                  className={`px-2 py-0.5 text-[11px] font-bold rounded-md transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 text-xs font-extrabold rounded-lg transition-all cursor-pointer ${
                     doctorOutputLangId === 'hi'
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'neu-pill text-blue-700 font-black'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
-                  title="Show in Hindi"
                 >
                   🇮🇳 हिन्दी
                 </button>
               </div>
 
-              {/* Play Speech button */}
+              {/* Play Audio Button */}
               <button
+                type="button"
                 onClick={handlePlayDoctorAudio}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
                   isPlayingAudio
-                    ? 'bg-blue-600 text-white shadow-xs animate-pulse'
-                    : 'bg-white text-blue-700 border border-sky-300 hover:bg-blue-50'
+                    ? 'neu-button-primary animate-pulse'
+                    : 'neu-button text-blue-700 hover:text-blue-900'
                 }`}
-                title="Play Audio in Doctor's Language"
               >
-                <Volume2 className="w-3.5 h-3.5" />
+                <Volume2 className="w-4 h-4 stroke-[2.4]" />
                 <span>{isPlayingAudio ? 'Speaking...' : 'Listen Audio'}</span>
               </button>
             </div>
           </div>
 
-          {/* Primary Translated Output Text */}
-          <p className="text-slate-950 font-bold text-base sm:text-lg leading-snug">
-            {analysis.doctorTranslation}
-          </p>
+          {/* Main Translated Output Text */}
+          <div className="p-4 neu-pressed rounded-2xl">
+            <p className="text-slate-900 font-black text-base sm:text-xl leading-relaxed">
+              {analysis.doctorTranslation}
+            </p>
+          </div>
 
-          {/* Secondary Translation Subtext (shows English if Hindi selected, or Hindi if English selected) */}
-          <div className="mt-2 pt-2 border-t border-sky-200/50 flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-600 font-medium">
+          {/* Subtext Reference */}
+          <div className="text-xs text-slate-500 font-medium">
             <span>
               {doctorOutputLangId === 'en'
-                ? `हिन्दी अनुवाद: ${analysis.hindiTranslation}`
-                : `English Ref: ${analysis.englishTranslation}`}
+                ? `हिन्दी अनुवाद reference: ${analysis.hindiTranslation}`
+                : `English reference: ${analysis.englishTranslation}`}
             </span>
           </div>
         </div>
 
-        {/* EMERGENCY TRIAGE & CRITICAL SYMPTOMS ALERT */}
+        {/* CRITICAL / URGENT TRIAGE CARDS */}
         {analysis.triageLevel === 'red' ? (
-          <div className="mt-4 p-4 bg-red-50 border-2 border-red-300 rounded-2xl shadow-sm animate-pulse" style={{ animationDuration: '3s' }}>
+          <div className="p-5 neu-card border-2 border-red-500/50 rounded-3xl space-y-3 bg-red-500/5">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-red-500/30">
-                <AlertTriangle className="w-6 h-6" />
+              <div className="w-10 h-10 rounded-2xl neu-raised text-red-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 stroke-[2.4] text-red-600 animate-pulse" />
               </div>
-              <div className="flex-1">
+              <div className="flex-1 space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-black tracking-wide bg-red-600 text-white uppercase">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black neu-button-emergency">
                       CRITICAL RED TRIAGE
                     </span>
-                    <h4 className="text-sm font-bold text-red-950 tracking-tight">
+                    <h4 className="text-sm font-black text-slate-900">
                       Immediate Cardiopulmonary Emergency
                     </h4>
                   </div>
                   <button
+                    type="button"
                     onClick={() => onNavigate('emergency')}
-                    className="px-3 py-1 rounded-xl bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1"
+                    className="px-3.5 py-1.5 rounded-xl neu-button-emergency text-xs font-extrabold flex items-center gap-1.5 cursor-pointer"
                   >
                     <span>Launch SOS Protocol</span>
-                    <ArrowRight className="w-3 h-3" />
+                    <ArrowRight className="w-3.5 h-3.5 stroke-[2.4]" />
                   </button>
                 </div>
-
-                <p className="text-xs text-red-900 mt-1 font-semibold">
+                <p className="text-xs text-slate-700 font-bold leading-relaxed">
                   {analysis.clinicalSummary}
                 </p>
-
-                <div className="mt-2 flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-2 pt-1">
                   {analysis.criticalSymptoms.map((symptom, i) => (
                     <span
                       key={i}
-                      className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-900 border border-red-300 flex items-center gap-1"
+                      className="px-3 py-1 rounded-full text-xs font-black neu-pill text-red-700 flex items-center gap-1.5"
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
+                      <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
                       <span>{symptom}</span>
                     </span>
                   ))}
@@ -547,62 +617,56 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
             </div>
           </div>
         ) : analysis.triageLevel === 'yellow' ? (
-          <div className="mt-4 p-3.5 bg-amber-50 border border-amber-200 rounded-2xl shadow-xs">
+          <div className="p-4 neu-card border border-amber-500/40 rounded-3xl space-y-2">
             <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0">
-                <ShieldAlert className="w-5 h-5" />
+              <div className="w-9 h-9 rounded-2xl neu-raised text-amber-600 flex items-center justify-center shrink-0">
+                <ShieldAlert className="w-5 h-5 stroke-[2.4]" />
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 uppercase">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black neu-pill text-amber-700">
                     YELLOW TRIAGE (URGENT)
                   </span>
                   <button
+                    type="button"
                     onClick={() => onNavigate('symptoms')}
-                    className="text-xs font-bold text-amber-800 underline hover:text-amber-950 cursor-pointer"
+                    className="text-xs font-extrabold text-blue-700 hover:text-blue-900 cursor-pointer"
                   >
                     Check Triage Symptoms &rarr;
                   </button>
                 </div>
-                <p className="text-xs text-amber-950 font-medium mt-1">
+                <p className="text-xs text-slate-700 font-bold mt-1">
                   {analysis.clinicalSummary}
                 </p>
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {analysis.criticalSymptoms.map((s, i) => (
-                    <span
-                      key={i}
-                      className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 text-amber-900"
-                    >
-                      {s}
-                    </span>
-                  ))}
-                </div>
               </div>
             </div>
           </div>
         ) : null}
       </div>
 
-      {/* Navigation & Action Bar at Bottom */}
-      <div className="pt-4 mt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2.5">
+      {/* BOTTOM NAVIGATION ACTION BAR */}
+      <div className="pt-6 mt-6 border-t border-slate-200/60 flex flex-wrap items-center justify-between gap-3">
         <button
+          type="button"
           onClick={() => onNavigate('symptoms')}
-          className="flex-1 py-2.5 px-3 bg-white border border-slate-200 hover:border-blue-400 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+          className="flex-1 py-3 px-4 rounded-2xl neu-button text-xs font-extrabold text-slate-800 hover:text-slate-900 transition-all cursor-pointer flex items-center justify-center gap-2"
         >
           <span>Select Symptoms</span>
         </button>
 
         <button
+          type="button"
           onClick={() => onNavigate('doctor_reply')}
-          className="flex-1 py-2.5 px-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/20 transition-all active:scale-95 cursor-pointer"
+          className="flex-1 py-3 px-4 rounded-2xl neu-button-primary text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-2"
         >
           <span>Doctor Reply ({analysis.detectedLanguage.name})</span>
-          <ArrowRight className="w-3.5 h-3.5" />
+          <ArrowRight className="w-4 h-4 stroke-[2.4]" />
         </button>
 
         <button
+          type="button"
           onClick={() => onNavigate('history')}
-          className="py-2.5 px-3 bg-white border border-slate-200 hover:border-blue-400 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+          className="py-3 px-4 rounded-2xl neu-button text-xs font-extrabold text-slate-800 hover:text-slate-900 transition-all cursor-pointer flex items-center justify-center gap-2"
         >
           <span>History</span>
         </button>
@@ -610,3 +674,4 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
     </div>
   );
 };
+

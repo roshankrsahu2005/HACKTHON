@@ -20,12 +20,10 @@ export function playTextToSpeech(
 
     const utterance = new SpeechSynthesisUtterance(text);
     
-    // Normalize language codes
+    // Normalize language codes to Indian BCP-47 speech locales
     const code = lang.toLowerCase();
     if (code.startsWith('hi') || code === 'hindi') {
       utterance.lang = 'hi-IN';
-    } else if (code.startsWith('en') || code === 'english') {
-      utterance.lang = 'en-US';
     } else if (code.startsWith('bn') || code === 'bengali') {
       utterance.lang = 'bn-IN';
     } else if (code.startsWith('ta') || code === 'tamil') {
@@ -36,16 +34,20 @@ export function playTextToSpeech(
       utterance.lang = 'mr-IN';
     } else if (code.startsWith('gu') || code === 'gujarati') {
       utterance.lang = 'gu-IN';
+    } else if (code.startsWith('kn') || code === 'kannada') {
+      utterance.lang = 'kn-IN';
+    } else if (code.startsWith('ml') || code === 'malayalam') {
+      utterance.lang = 'ml-IN';
     } else if (code.startsWith('pa') || code === 'punjabi') {
       utterance.lang = 'pa-IN';
-    } else if (code.startsWith('es') || code === 'spanish') {
-      utterance.lang = 'es-ES';
-    } else if (code.startsWith('fr') || code === 'french') {
-      utterance.lang = 'fr-FR';
-    } else if (code.startsWith('ar') || code === 'arabic') {
-      utterance.lang = 'ar-SA';
+    } else if (code.startsWith('or') || code === 'odia') {
+      utterance.lang = 'or-IN';
+    } else if (code.startsWith('as') || code === 'assamese') {
+      utterance.lang = 'as-IN';
     } else if (code.startsWith('ur') || code === 'urdu') {
-      utterance.lang = 'ur-PK';
+      utterance.lang = 'ur-IN';
+    } else if (code.startsWith('en') || code === 'english') {
+      utterance.lang = 'en-IN';
     } else {
       utterance.lang = lang;
     }

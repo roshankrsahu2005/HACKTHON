@@ -10,17 +10,18 @@ import {
 
 export const LANGUAGES: Language[] = [
   { id: 'hi', name: 'Hindi', nativeName: 'हिन्दी', flag: '🇮🇳', isDownloaded: true, size: '28 MB' },
-  { id: 'en', name: 'English', nativeName: 'English', flag: '🇬🇧', isDownloaded: true, size: '32 MB' },
-  { id: 'bn', name: 'Bengali', nativeName: 'বাংলা', flag: '🇧🇩', isDownloaded: true, size: '25 MB' },
+  { id: 'bn', name: 'Bengali', nativeName: 'বাংলা', flag: '🇮🇳', isDownloaded: true, size: '25 MB' },
   { id: 'mr', name: 'Marathi', nativeName: 'मराठी', flag: '🇮🇳', isDownloaded: true, size: '26 MB' },
   { id: 'ta', name: 'Tamil', nativeName: 'தமிழ்', flag: '🇮🇳', isDownloaded: true, size: '27 MB' },
   { id: 'te', name: 'Telugu', nativeName: 'తెలుగు', flag: '🇮🇳', isDownloaded: true, size: '26 MB' },
   { id: 'gu', name: 'Gujarati', nativeName: 'ગુજરાતી', flag: '🇮🇳', isDownloaded: true, size: '24 MB' },
+  { id: 'kn', name: 'Kannada', nativeName: 'ಕನ್ನಡ', flag: '🇮🇳', isDownloaded: true, size: '26 MB' },
+  { id: 'ml', name: 'Malayalam', nativeName: 'മലയാളം', flag: '🇮🇳', isDownloaded: true, size: '25 MB' },
   { id: 'pa', name: 'Punjabi', nativeName: 'ਪੰਜਾਬੀ', flag: '🇮🇳', isDownloaded: true, size: '25 MB' },
-  { id: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸', isDownloaded: true, size: '26 MB' },
-  { id: 'ar', name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦', isDownloaded: true, size: '30 MB' },
-  { id: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷', isDownloaded: false, size: '24 MB' },
-  { id: 'ur', name: 'Urdu', nativeName: 'اردو', flag: '🇵🇰', isDownloaded: true, size: '27 MB' }
+  { id: 'or', name: 'Odia', nativeName: 'ଓଡ଼ିଆ', flag: '🇮🇳', isDownloaded: true, size: '23 MB' },
+  { id: 'as', name: 'Assamese', nativeName: 'অসমীয়া', flag: '🇮🇳', isDownloaded: true, size: '22 MB' },
+  { id: 'ur', name: 'Urdu', nativeName: 'اردو', flag: '🇮🇳', isDownloaded: true, size: '27 MB' },
+  { id: 'en', name: 'English (India)', nativeName: 'English (India)', flag: '🇮🇳', isDownloaded: true, size: '32 MB' }
 ];
 
 export const SYMPTOMS_LIST: SymptomItem[] = [

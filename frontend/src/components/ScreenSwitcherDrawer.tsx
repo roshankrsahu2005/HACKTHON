@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, Layers, Check, Sparkles, Shield, Languages, MessageSquare, Stethoscope, Activity, User, Siren, Pill, Clock, ArrowRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Globe, BookOpen, Siren, DownloadCloud, Clock, Settings, ShieldCheck, Info, Check, ArrowRight } from 'lucide-react';
 import { ScreenId } from '../types';
 
 interface ScreenSwitcherDrawerProps {
@@ -9,198 +9,250 @@ interface ScreenSwitcherDrawerProps {
   onSelectScreen: (screen: ScreenId) => void;
 }
 
-interface ScreenInfo {
-  id: ScreenId;
-  number: number;
-  title: string;
-  subtitle: string;
-  category: string;
-  icon: React.ReactNode;
-}
-
-const SCREENS_CONFIG: ScreenInfo[] = [
-  {
-    id: 'splash',
-    number: 1,
-    title: 'Splash / Landing Screen',
-    subtitle: 'Branding, offline capabilities & get started CTA',
-    category: 'Onboarding',
-    icon: <Shield className="w-4 h-4 text-blue-600" />,
-  },
-  {
-    id: 'languages',
-    number: 2,
-    title: 'Language Selection',
-    subtitle: 'From/To language pickers, swap & offline pack status',
-    category: 'Setup',
-    icon: <Languages className="w-4 h-4 text-cyan-600" />,
-  },
-  {
-    id: 'patient_translation',
-    number: 3,
-    title: 'Main Translation Screen',
-    subtitle: 'Patient mode with audio waves & critical symptom alert',
-    category: 'Translation',
-    icon: <MessageSquare className="w-4 h-4 text-blue-600" />,
-  },
-  {
-    id: 'doctor_reply',
-    number: 4,
-    title: 'Doctor Reply',
-    subtitle: 'Doctor question input & patient translated output',
-    category: 'Translation',
-    icon: <Stethoscope className="w-4 h-4 text-rose-600" />,
-  },
-  {
-    id: 'symptoms',
-    number: 5,
-    title: 'Quick Symptom Selection',
-    subtitle: '2-column pastel cards with audio pronunciation',
-    category: 'Clinical',
-    icon: <Activity className="w-4 h-4 text-orange-500" />,
-  },
-  {
-    id: 'body_map',
-    number: 6,
-    title: 'Body Map Screen',
-    subtitle: 'Interactive front/back silhouette & pain severity dial',
-    category: 'Clinical',
-    icon: <User className="w-4 h-4 text-indigo-600" />,
-  },
-  {
-    id: 'emergency',
-    number: 7,
-    title: 'Emergency / SOS Mode',
-    subtitle: 'High-contrast red triage tiles & doctor audio broadcast',
-    category: 'Urgent Care',
-    icon: <Siren className="w-4 h-4 text-red-600" />,
-  },
-  {
-    id: 'medicine',
-    number: 8,
-    title: 'Medicine Instructions',
-    subtitle: 'Dosage translator for tablet, syrup, injection, inhaler',
-    category: 'Pharmacy',
-    icon: <Pill className="w-4 h-4 text-emerald-600" />,
-  },
-  {
-    id: 'history',
-    number: 9,
-    title: 'Conversation History',
-    subtitle: 'Chronological transcript with audio replay and timestamps',
-    category: 'Records',
-    icon: <Clock className="w-4 h-4 text-slate-600" />,
-  },
-  {
-    id: 'profile',
-    number: 10,
-    title: 'Patient Profile (Optional)',
-    subtitle: 'Encrypted offline records: blood group, allergies, meds',
-    category: 'Records',
-    icon: <User className="w-4 h-4 text-blue-600" />,
-  },
-];
-
 export const ScreenSwitcherDrawer: React.FC<ScreenSwitcherDrawerProps> = ({
   isOpen,
   onClose,
   currentScreen,
   onSelectScreen,
 }) => {
+  const [activeModal, setActiveModal] = useState<'privacy' | 'about' | 'offline' | null>(null);
+
   if (!isOpen) return null;
 
+  const handleAction = (action: () => void) => {
+    action();
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-end p-2 sm:p-6 bg-slate-950/40 backdrop-blur-xs animate-fade-in">
       <div
-        className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh] animate-slide-up"
+        className="w-full max-w-sm bg-[#eef3fa] rounded-3xl neu-card border border-white/80 overflow-hidden flex flex-col shadow-2xl animate-slide-up my-2 mr-2"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Drawer Header */}
-        <div className="p-4 px-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+        {/* Menu Header */}
+        <div className="p-4 px-5 border-b border-[#dbe4f0] flex items-center justify-between bg-[#eef3fa]">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
-              <Layers className="w-4 h-4" />
+            <div className="w-9 h-9 rounded-2xl neu-pressed text-blue-600 flex items-center justify-center font-black text-lg">
+              ☰
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900">Hear2Heal Screens</h3>
-              <p className="text-xs text-slate-500">Jump directly to any of the 10 mobile views</p>
+              <h3 className="text-base font-black text-slate-900 tracking-tight">Main Menu</h3>
+              <p className="text-[11px] text-slate-500 font-medium">Hear2Heal Navigation</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-xl neu-button flex items-center justify-center text-slate-500 hover:text-slate-900 transition-all cursor-pointer"
+            aria-label="Close Menu"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5 stroke-[2.4]" />
           </button>
         </div>
 
-        {/* Scrollable list of 10 screens */}
-        <div className="p-3 space-y-1.5 overflow-y-auto flex-1 divide-y divide-slate-100">
-          {SCREENS_CONFIG.map((scr) => {
-            const isActive = currentScreen === scr.id;
-            return (
-              <button
-                key={scr.id}
-                onClick={() => {
-                  onSelectScreen(scr.id);
-                  onClose();
-                }}
-                className={`w-full p-3 rounded-xl flex items-center justify-between text-left transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-blue-50 border border-blue-200 shadow-xs'
-                    : 'hover:bg-slate-50 border border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  {/* Screen Number Badge */}
-                  <span
-                    className={`w-6 h-6 rounded-lg text-xs font-bold flex items-center justify-center shrink-0 ${
-                      isActive
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    {scr.number}
-                  </span>
+        {/* Menu Items List */}
+        <div className="p-4 space-y-3 overflow-y-auto max-h-[75vh]">
+          {/* Group 1: Core Clinical Operations */}
+          <div className="space-y-2">
+            {/* 🌐 Language Settings */}
+            <button
+              onClick={() => handleAction(() => onSelectScreen('languages'))}
+              className={`w-full p-3.5 rounded-2xl flex items-center justify-between text-left transition-all cursor-pointer ${
+                currentScreen === 'languages'
+                  ? 'neu-pressed text-blue-700 font-extrabold'
+                  : 'neu-button text-slate-800 hover:text-blue-900'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-xl">🌐</span>
+                <span className="text-sm font-bold">Language Settings</span>
+              </div>
+              <ChevronRightIcon className="w-4 h-4 text-slate-400" />
+            </button>
 
-                  <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-2xs">
-                    {scr.icon}
-                  </div>
+            {/* 📚 Medical Phrasebook */}
+            <button
+              onClick={() => handleAction(() => onSelectScreen('symptoms'))}
+              className={`w-full p-3.5 rounded-2xl flex items-center justify-between text-left transition-all cursor-pointer ${
+                currentScreen === 'symptoms'
+                  ? 'neu-pressed text-blue-700 font-extrabold'
+                  : 'neu-button text-slate-800 hover:text-blue-900'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-xl">📚</span>
+                <span className="text-sm font-bold">Medical Phrasebook</span>
+              </div>
+              <ChevronRightIcon className="w-4 h-4 text-slate-400" />
+            </button>
 
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-slate-900">
-                        {scr.title}
-                      </span>
-                      <span className="text-[10px] uppercase font-semibold text-slate-400">
-                        {scr.category}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 line-clamp-1">{scr.subtitle}</p>
-                  </div>
-                </div>
+            {/* 🚨 Emergency Mode */}
+            <button
+              onClick={() => handleAction(() => onSelectScreen('emergency'))}
+              className={`w-full p-3.5 rounded-2xl flex items-center justify-between text-left transition-all cursor-pointer ${
+                currentScreen === 'emergency'
+                  ? 'neu-button-emergency font-black'
+                  : 'neu-button bg-red-50/60 border border-red-200 text-red-900 hover:bg-red-100/60'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-xl animate-pulse">🚨</span>
+                <span className="text-sm font-black">Emergency Mode</span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black neu-pill text-red-600">SOS</span>
+            </button>
 
-                <div className="pl-2">
-                  {isActive ? (
-                    <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-600">
-                      <Check className="w-4 h-4" /> Active
-                    </span>
-                  ) : (
-                    <ArrowRight className="w-4 h-4 text-slate-300" />
-                  )}
-                </div>
-              </button>
-            );
-          })}
+            {/* 📥 Offline Downloads */}
+            <button
+              onClick={() => setActiveModal('offline')}
+              className="w-full p-3.5 rounded-2xl neu-button text-slate-800 hover:text-emerald-700 flex items-center justify-between text-left transition-all cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-xl">📥</span>
+                <span className="text-sm font-bold">Offline Downloads</span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold neu-pill text-emerald-700">Ready</span>
+            </button>
+
+            {/* 🕘 Translation History */}
+            <button
+              onClick={() => handleAction(() => onSelectScreen('history'))}
+              className={`w-full p-3.5 rounded-2xl flex items-center justify-between text-left transition-all cursor-pointer ${
+                currentScreen === 'history'
+                  ? 'neu-pressed text-blue-700 font-extrabold'
+                  : 'neu-button text-slate-800 hover:text-blue-900'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-xl">🕘</span>
+                <span className="text-sm font-bold">Translation History</span>
+              </div>
+              <ChevronRightIcon className="w-4 h-4 text-slate-400" />
+            </button>
+          </div>
+
+          {/* Section Divider Line */}
+          <div className="my-3 border-t border-[#c0cfdf]/70 border-dashed" />
+
+          {/* Group 2: System & Privacy */}
+          <div className="space-y-2">
+            {/* ⚙️ Settings & Privacy */}
+            <button
+              onClick={() => handleAction(() => onSelectScreen('settings'))}
+              className={`w-full p-3.5 rounded-2xl flex items-center justify-between text-left transition-all cursor-pointer ${
+                currentScreen === 'settings'
+                  ? 'neu-pressed text-blue-700 font-extrabold'
+                  : 'neu-button text-slate-800 hover:text-blue-900'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-xl">⚙️</span>
+                <span className="text-sm font-bold">Settings & Privacy</span>
+              </div>
+              <ChevronRightIcon className="w-4 h-4 text-slate-400" />
+            </button>
+
+            {/* ℹ️ About */}
+            <button
+              onClick={() => setActiveModal('about')}
+              className="w-full p-3.5 rounded-2xl neu-button text-slate-800 hover:text-blue-700 flex items-center justify-between text-left transition-all cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-xl">ℹ️</span>
+                <span className="text-sm font-bold">About</span>
+              </div>
+              <ChevronRightIcon className="w-4 h-4 text-slate-400" />
+            </button>
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-3 bg-slate-50 border-t border-slate-100 text-center">
-          <p className="text-[11px] text-slate-500">
-            Offline First Engine · High-reliability clinical terminology v2.4
+        {/* Footer info */}
+        <div className="p-3.5 bg-[#eef3fa] border-t border-[#dbe4f0] text-center">
+          <p className="text-[11px] text-slate-500 font-medium">
+            Hear2Heal · Offline Clinical Suite v2.4
           </p>
         </div>
       </div>
+
+      {/* Info Modals */}
+      {activeModal && (
+        <div
+          className="fixed inset-0 z-60 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setActiveModal(null)}
+        >
+          <div
+            className="w-full max-w-md bg-[#eef3fa] rounded-3xl neu-card p-6 border border-white/80 shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setActiveModal(null)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-xl neu-button flex items-center justify-center text-slate-500 hover:text-slate-900 cursor-pointer"
+            >
+              <X className="w-4 h-4 stroke-[2.4]" />
+            </button>
+
+            {activeModal === 'privacy' && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 text-indigo-700 font-black text-lg">
+                  <span className="text-2xl">🔒</span>
+                  <span>Privacy & Security</span>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                  Hear2Heal operates on a 100% Zero-Cloud Upload spec for patient speech and clinical data.
+                  All voice synthesis, NLP auto-detection, and symptom assessments run locally on your device in compliance with HIPAA and GDPR medical data standards.
+                </p>
+              </div>
+            )}
+
+            {activeModal === 'about' && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 text-blue-700 font-black text-lg">
+                  <span className="text-2xl">ℹ️</span>
+                  <span>About Hear2Heal</span>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                  Hear2Heal is an Offline Medical Language Auto-Detection & Clinical Translation Engine designed for Emergency Hospital & Triage environments.
+                </p>
+                <div className="text-[11px] text-slate-500 font-mono bg-slate-200/50 p-2.5 rounded-xl border border-slate-300/60">
+                  Version: 2.4.0 (Indian Clinical Dialects Pack)
+                </div>
+              </div>
+            )}
+
+            {activeModal === 'offline' && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 text-emerald-700 font-black text-lg">
+                  <span className="text-2xl">📥</span>
+                  <span>Offline Downloads</span>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                  All 13 Indian regional language models (Hindi, Bengali, Marathi, Tamil, Telugu, Gujarati, Kannada, Malayalam, Punjabi, Odia, Assamese, Urdu, English) are pre-loaded & cached for instant offline speech synthesis.
+                </p>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full neu-pill text-emerald-700 text-xs font-bold">
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>100% Downloaded & Active</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
+function ChevronRightIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      {...props}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      viewBox="0 0 24 24"
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}

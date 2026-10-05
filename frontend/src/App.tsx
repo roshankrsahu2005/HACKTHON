@@ -3,7 +3,7 @@
  * Production Web Portal
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Layers,
   Menu,
@@ -24,9 +24,10 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   LogOut,
-  Database
+  Database,
+  Settings
 } from 'lucide-react';
-import { ScreenId, Language, PainSeverity, PatientProfile } from './types';
+import { ScreenId, Language, PainSeverity, PatientProfile, ThemeOption } from './types';
 import { LANGUAGES, INITIAL_PATIENT_PROFILE } from './data/mockData';
 import { MobileFrame } from './components/MobileFrame';
 import { ScreenSwitcherDrawer } from './components/ScreenSwitcherDrawer';
@@ -44,14 +45,28 @@ import { EmergencyScreen } from './components/screens/EmergencyScreen';
 import { MedicineScreen } from './components/screens/MedicineScreen';
 import { HistoryScreen } from './components/screens/HistoryScreen';
 import { ProfileScreen } from './components/screens/ProfileScreen';
+import { SettingsScreen } from './components/screens/SettingsScreen';
 
 export default function App() {
   // Authentication State (Default: false to show Login first)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
 
+  // Global Theme Option State
+  const [currentTheme, setCurrentTheme] = useState<ThemeOption>(() => {
+    const saved = localStorage.getItem('h2h_theme');
+    return (saved as ThemeOption) || 'light';
+  });
+
+  // Dynamically update data-theme attribute on root HTML element
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    localStorage.setItem('h2h_theme', currentTheme);
+  }, [currentTheme]);
+
   // Current active screen (when logged in, starts in Overview 'splash')
   const [currentScreen, setCurrentScreen] = useState<ScreenId>('splash');
+
   const [viewMode, setViewMode] = useState<'device' | 'gallery'>('device');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
@@ -169,6 +184,20 @@ export default function App() {
             onNavigate={setCurrentScreen}
             profile={patientProfile}
             onSaveProfile={setPatientProfile}
+            onLogout={handleLogout}
+          />
+        );
+      case 'settings':
+        return (
+          <SettingsScreen
+            onNavigate={setCurrentScreen}
+            patientLang={patientLang}
+            doctorLang={doctorLang}
+            onSelectPatientLang={setPatientLang}
+            onSelectDoctorLang={setDoctorLang}
+            currentTheme={currentTheme}
+            onSelectTheme={setCurrentTheme}
+            onLogout={handleLogout}
           />
         );
       default:
@@ -182,9 +211,9 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col font-sans text-slate-800 overflow-hidden">
-      {/* Top Website Header */}
-      <header className="sticky top-0 z-40 shrink-0 border-b border-white/60 bg-white/70 backdrop-blur-xl shadow-[0_18px_50px_-30px_rgba(15,23,42,0.38)]">
+    <div className="h-screen w-screen flex flex-col font-sans text-slate-800 overflow-hidden bg-[#eef3fa]">
+      {/* Top Website Neumorphic Header */}
+      <header className="sticky top-0 z-40 shrink-0 border-b border-[#dbe4f0] bg-[#eef3fa] shadow-[0_4px_16px_#c0cfdf]">
         <div className="w-full px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3">
           {/* Brand Logo & Name (Left Corner) */}
           <div className="flex items-center gap-2 sm:gap-3">
@@ -192,15 +221,15 @@ export default function App() {
               onClick={() => setCurrentScreen('splash')}
               className="flex items-center gap-2.5 text-left cursor-pointer group"
             >
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 via-blue-700 to-cyan-500 text-white flex items-center justify-center shadow-[0_14px_28px_-12px_rgba(37,99,235,0.8)] group-hover:scale-105 transition-transform">
-                <span className="font-extrabold text-[11px] tracking-[0.2em]">H2H</span>
+              <div className="w-10 h-10 rounded-2xl neu-raised text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <span className="font-black text-[12px] tracking-[0.15em] text-blue-600">H2H</span>
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-black text-slate-900 text-base tracking-tight">
                     Hear2Heal
                   </span>
-                  <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200">
+                  <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold neu-pill text-emerald-700">
                     <ShieldCheck className="w-3 h-3 text-emerald-600" />
                     Offline Ready
                   </span>
@@ -213,14 +242,14 @@ export default function App() {
           </div>
 
           {/* Active Language Pair Quick Bar (Center) */}
-          <div className="hidden sm:flex items-center gap-1.5 bg-slate-100/90 border border-slate-200/80 rounded-2xl px-2.5 py-1.5 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]">
+          <div className="hidden sm:flex items-center gap-2 neu-pressed px-3 py-1.5 text-xs">
             <button
               onClick={() => setCurrentScreen('languages')}
-              className="font-semibold text-slate-700 hover:text-blue-600 flex items-center gap-1.5 cursor-pointer"
+              className="font-bold text-slate-700 hover:text-blue-600 flex items-center gap-1.5 cursor-pointer"
               title="Change Patient Language"
             >
               <span>{patientLang.flag}</span>
-              <span className="font-bold">{patientLang.name}</span>
+              <span className="font-extrabold">{patientLang.name}</span>
               <span className="text-[10px] text-slate-400 font-normal hidden lg:inline">
                 (Patient)
               </span>
@@ -228,7 +257,7 @@ export default function App() {
 
             <button
               onClick={handleSwapLanguages}
-              className="w-7 h-7 rounded-xl bg-white shadow-[0_10px_24px_-18px_rgba(15,23,42,0.5)] border border-slate-200 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-slate-50 transition-all cursor-pointer"
+              className="w-7 h-7 rounded-xl neu-button flex items-center justify-center text-slate-600 hover:text-blue-600 transition-all cursor-pointer"
               title="Swap Languages"
             >
               <ArrowRightLeft className="w-3.5 h-3.5" />
@@ -236,73 +265,48 @@ export default function App() {
 
             <button
               onClick={() => setCurrentScreen('languages')}
-              className="font-semibold text-slate-700 hover:text-blue-600 flex items-center gap-1.5 cursor-pointer"
+              className="font-bold text-slate-700 hover:text-blue-600 flex items-center gap-1.5 cursor-pointer"
               title="Change Doctor Language"
             >
               <span>{doctorLang.flag}</span>
-              <span className="font-bold">{doctorLang.name}</span>
+              <span className="font-extrabold">{doctorLang.name}</span>
               <span className="text-[10px] text-slate-400 font-normal hidden lg:inline">
                 (Doctor)
               </span>
             </button>
           </div>
 
-          {/* TOP RIGHT CORNER: Conversations History, Profile, Languages, SOS, Clinician Info & Logout */}
+          {/* TOP RIGHT CORNER: Profile, Settings, SOS, Clinician Info */}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* 1. Conversations History / Transcripts */}
-            <button
-              onClick={() => setCurrentScreen('history')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                currentScreen === 'history'
-                  ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-[0_14px_28px_-18px_rgba(37,99,235,0.8)]'
-                  : 'bg-slate-100 hover:bg-slate-200/90 text-slate-700'
-              }`}
-              title="View Conversations History & Transcripts"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Conversations History</span>
-              <span className="sm:hidden">History</span>
-            </button>
-
-            {/* 2. Patient Profile */}
+            {/* 1. Patient Profile */}
             <button
               onClick={() => setCurrentScreen('profile')}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 currentScreen === 'profile'
-                  ? 'bg-gradient-to-r from-sky-600 to-blue-600 text-white font-bold shadow-[0_14px_28px_-18px_rgba(14,165,233,0.8)]'
-                  : 'bg-slate-100 hover:bg-slate-200/90 text-slate-700'
+                  ? 'neu-pressed text-blue-700 font-bold'
+                  : 'neu-button text-slate-700 hover:text-slate-900'
               }`}
               title="Patient Profile & Allergies"
             >
-              <User className="w-3.5 h-3.5" />
+              <User className="w-3.5 h-3.5 stroke-[2.2]" />
               <span className="hidden md:inline">Profile</span>
             </button>
 
-            {/* 3. Languages */}
+            {/* 2. System Settings & Privacy Page Button */}
             <button
-              onClick={() => setCurrentScreen('languages')}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                currentScreen === 'languages'
-                  ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold shadow-[0_14px_28px_-18px_rgba(79,70,229,0.8)]'
-                  : 'bg-slate-100 hover:bg-slate-200/90 text-slate-700'
+              onClick={() => setCurrentScreen('settings')}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                currentScreen === 'settings'
+                  ? 'neu-pressed text-blue-700 font-bold'
+                  : 'neu-button text-slate-700 hover:text-slate-900'
               }`}
-              title="Manage Offline Language Packs"
+              title="Open System Settings & Privacy Page"
             >
-              <Globe className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Languages</span>
+              <Settings className="w-3.5 h-3.5 stroke-[2.2]" />
+              <span className="hidden md:inline">Settings & Privacy</span>
             </button>
 
-            {/* 4. Supabase Cloud DB Connector */}
-            <button
-              onClick={() => setIsSupabaseModalOpen(true)}
-              className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-              title="Connect & Attach Supabase Database"
-            >
-              <Database className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden sm:inline">Supabase DB</span>
-            </button>
-
-            {/* 5. Quick Emergency SOS Button */}
+            {/* 3. Quick Emergency SOS Button */}
             <button
               onClick={() => setCurrentScreen('emergency')}
               className="px-3 py-1.5 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 active:scale-95 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-[0_16px_30px_-14px_rgba(239,68,68,0.8)] transition-all cursor-pointer"
@@ -314,30 +318,20 @@ export default function App() {
 
             {/* Logged-in User Badge */}
             {currentUser && (
-              <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-xl border border-slate-200 text-xs text-slate-700 font-bold">
+              <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 neu-pill text-xs text-slate-700 font-bold">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span className="truncate max-w-[130px]">{currentUser.name}</span>
               </div>
             )}
 
-            {/* Logout Button */}
-            <button
-              onClick={handleLogout}
-              className="p-2 rounded-xl bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 transition-all cursor-pointer ml-0.5"
-              title="Lock / Sign Out of Portal"
-              aria-label="Logout"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-
-            {/* Screens List Drawer Button */}
+            {/* 3-Line Menu (Hamburger) Button in Top Right */}
             <button
               onClick={() => setIsDrawerOpen(true)}
-              className="w-8 h-8 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl flex items-center justify-center transition-all cursor-pointer"
-              title="All Screens Drawer"
-              aria-label="Open menu"
+              className="w-9 h-9 rounded-2xl neu-button text-slate-700 hover:text-blue-600 flex items-center justify-center transition-all cursor-pointer ml-1"
+              title="Navigation Menu"
+              aria-label="Navigation Menu"
             >
-              <Menu className="w-4 h-4 stroke-[2.5]" />
+              <Menu className="w-4 h-4 stroke-[2.4]" />
             </button>
           </div>
         </div>

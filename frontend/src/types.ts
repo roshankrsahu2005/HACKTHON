@@ -8,7 +8,11 @@ export type ScreenId =
   | 'emergency'
   | 'medicine'
   | 'history'
-  | 'profile';
+  | 'profile'
+  | 'settings';
+
+export type ThemeOption = 'light' | 'slate' | 'cyan' | 'emerald';
+
 
 export interface Language {
   id: string;

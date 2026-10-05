@@ -1,15 +1,138 @@
 @import "tailwindcss";
 
-:root {
-  font-family: Inter, "Segoe UI", sans-serif;
+:root,
+[data-theme="light"] {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #0f172a;
-  background: #edf6ff;
+  color: #1e293b;
+  background-color: #eef3fa;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  --bg-color: #eef3fa;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --border-color: #dbe4f0;
+  --neu-bg: #eef3fa;
+  --neu-shadow-dark: #c0cfdf;
+  --neu-shadow-light: #ffffff;
+  --neu-pressed-bg: #e6eef8;
+  --neu-primary: linear-gradient(145deg, #3b82f6, #2563eb);
+}
+
+[data-theme="slate"] {
+  color: #f8fafc;
+  background-color: #0f172a;
+
+  --bg-color: #0f172a;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+  --neu-bg: #1e293b;
+  --neu-shadow-dark: #090d16;
+  --neu-shadow-light: #2c3b52;
+  --neu-pressed-bg: #162032;
+  --neu-primary: linear-gradient(145deg, #6366f1, #4f46e5);
+}
+
+/* Slate Dark Theme Color Adaptations */
+[data-theme="slate"] .text-slate-900,
+[data-theme="slate"] .text-slate-800,
+[data-theme="slate"] .text-slate-700 {
+  color: #f8fafc !important;
+}
+
+[data-theme="slate"] .text-slate-600,
+[data-theme="slate"] .text-slate-500 {
+  color: #cbd5e1 !important;
+}
+
+[data-theme="slate"] .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+[data-theme="slate"] .bg-\[\#eef3fa\],
+[data-theme="slate"] .bg-slate-100\/60,
+[data-theme="slate"] .bg-white {
+  background-color: #1e293b !important;
+}
+
+[data-theme="slate"] .border-\[\#dbe4f0\],
+[data-theme="slate"] .border-slate-200\/80,
+[data-theme="slate"] .border-slate-200\/90 {
+  border-color: #334155 !important;
+}
+
+[data-theme="slate"] select,
+[data-theme="slate"] option,
+[data-theme="slate"] input {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="cyan"] {
+  color: #0c4a6e;
+  background-color: #e0f2fe;
+
+  --bg-color: #e0f2fe;
+  --text-main: #0c4a6e;
+  --text-muted: #0284c7;
+  --border-color: #bae6fd;
+  --neu-bg: #e6f7ff;
+  --neu-shadow-dark: #b8e2f8;
+  --neu-shadow-light: #ffffff;
+  --neu-pressed-bg: #d4effc;
+  --neu-primary: linear-gradient(145deg, #0891b2, #0e7490);
+}
+
+[data-theme="cyan"] .bg-\[\#eef3fa\],
+[data-theme="cyan"] .bg-slate-100\/60 {
+  background-color: #e0f2fe !important;
+}
+
+[data-theme="cyan"] .border-\[\#dbe4f0\] {
+  border-color: #bae6fd !important;
+}
+
+[data-theme="cyan"] select,
+[data-theme="cyan"] option,
+[data-theme="cyan"] input {
+  background-color: #e6f7ff !important;
+  color: #0c4a6e !important;
+}
+
+[data-theme="emerald"] {
+  color: #064e3b;
+  background-color: #dcfce7;
+
+  --bg-color: #dcfce7;
+  --text-main: #064e3b;
+  --text-muted: #059669;
+  --border-color: #bbf7d0;
+  --neu-bg: #e8f8f2;
+  --neu-shadow-dark: #bae4d2;
+  --neu-shadow-light: #ffffff;
+  --neu-pressed-bg: #d0f0e3;
+  --neu-primary: linear-gradient(145deg, #059669, #047857);
+}
+
+[data-theme="emerald"] .bg-\[\#eef3fa\],
+[data-theme="emerald"] .bg-slate-100\/60 {
+  background-color: #dcfce7 !important;
+}
+
+[data-theme="emerald"] .border-\[\#dbe4f0\] {
+  border-color: #bbf7d0 !important;
+}
+
+[data-theme="emerald"] select,
+[data-theme="emerald"] option,
+[data-theme="emerald"] input {
+  background-color: #e8f8f2 !important;
+  color: #064e3b !important;
 }
 
 html,
@@ -18,68 +141,169 @@ body,
   min-height: 100%;
   height: 100%;
   margin: 0;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 body {
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top left, rgba(59, 130, 246, 0.22), transparent 26%),
-    radial-gradient(circle at bottom right, rgba(34, 197, 94, 0.12), transparent 28%),
-    linear-gradient(135deg, #f6fbff 0%, #edf5ff 45%, #eefcf9 100%);
+  background: var(--bg-color);
+  color: var(--text-main);
 }
 
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
-  background-size: 28px 28px;
-  mask-image: radial-gradient(circle at center, black 35%, transparent 100%);
-  pointer-events: none;
+
+/* Base Neumorphic Surface Classes */
+.neu-flat {
+  background: var(--neu-bg);
+  box-shadow: 6px 6px 14px var(--neu-shadow-dark), -6px -6px 14px var(--neu-shadow-light);
+  border-radius: 1rem;
 }
 
-button,
-input {
-  font: inherit;
+.neu-raised {
+  background: var(--neu-bg);
+  box-shadow: 8px 8px 18px var(--neu-shadow-dark), -8px -8px 18px var(--neu-shadow-light);
+  border-radius: 1rem;
 }
 
+.neu-pressed,
+.neu-inset {
+  background: var(--neu-pressed-bg);
+  box-shadow: inset 4px 4px 8px var(--neu-shadow-dark), inset -4px -4px 8px var(--neu-shadow-light);
+  border-radius: 1rem;
+}
+
+/* Neumorphic Interactive Button */
+.neu-button {
+  background: var(--neu-bg);
+  box-shadow: 5px 5px 12px var(--neu-shadow-dark), -5px -5px 12px var(--neu-shadow-light);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 0.875rem;
+}
+
+.neu-button:hover {
+  box-shadow: 7px 7px 16px var(--neu-shadow-dark), -7px -7px 16px var(--neu-shadow-light);
+  transform: translateY(-1px);
+}
+
+.neu-button:active,
+.neu-button-active {
+  background: var(--neu-pressed-bg);
+  box-shadow: inset 3px 3px 6px var(--neu-shadow-dark), inset -3px -3px 6px var(--neu-shadow-light);
+  transform: translateY(0);
+}
+
+/* Primary Medical Blue Neumorphic Accent Button */
+.neu-button-primary {
+  background: var(--neu-primary);
+  box-shadow: 5px 5px 14px rgba(37, 99, 235, 0.35), -5px -5px 14px var(--neu-shadow-light);
+  color: #ffffff;
+  transition: all 0.2s ease;
+  border-radius: 0.875rem;
+}
+
+.neu-button-primary:hover {
+  box-shadow: 7px 7px 18px rgba(37, 99, 235, 0.45), -7px -7px 18px var(--neu-shadow-light);
+  transform: translateY(-1px);
+}
+
+.neu-button-primary:active {
+  box-shadow: inset 3px 3px 6px rgba(0, 0, 0, 0.3), inset -3px -3px 6px rgba(255, 255, 255, 0.2);
+  transform: translateY(0);
+}
+
+/* Emergency Red Neumorphic Accent Button */
+.neu-button-emergency {
+  background: linear-gradient(145deg, #ef4444, #dc2626);
+  box-shadow: 5px 5px 14px rgba(220, 38, 38, 0.35), -5px -5px 14px var(--neu-shadow-light);
+  color: #ffffff;
+  transition: all 0.2s ease;
+  border-radius: 0.875rem;
+}
+
+.neu-button-emergency:hover {
+  box-shadow: 7px 7px 18px rgba(220, 38, 38, 0.5), -7px -7px 18px var(--neu-shadow-light);
+  transform: translateY(-1px);
+}
+
+/* Neumorphic Input & Search Bar */
+.neu-input {
+  background: var(--neu-bg);
+  box-shadow: inset 3px 3px 7px var(--neu-shadow-dark), inset -3px -3px 7px var(--neu-shadow-light);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0.875rem;
+  color: var(--text-main);
+  transition: all 0.2s ease;
+}
+
+.neu-input:focus {
+  outline: none;
+  box-shadow: inset 4px 4px 8px var(--neu-shadow-dark), inset -4px -4px 8px var(--neu-shadow-light), 0 0 0 2px rgba(59, 130, 246, 0.4);
+}
+
+/* Neumorphic Card Container */
+.neu-card {
+  background: var(--neu-bg);
+  box-shadow: 7px 7px 16px var(--neu-shadow-dark), -7px -7px 16px var(--neu-shadow-light);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 1.25rem;
+}
+
+/* Neumorphic Pill / Badge */
+.neu-pill {
+  background: var(--neu-bg);
+  box-shadow: 3px 3px 8px var(--neu-shadow-dark), -3px -3px 8px var(--neu-shadow-light);
+  border-radius: 9999px;
+}
+
+.neu-pill-pressed {
+  background: var(--neu-pressed-bg);
+  box-shadow: inset 2px 2px 5px var(--neu-shadow-dark), inset -2px -2px 5px var(--neu-shadow-light);
+  border-radius: 9999px;
+}
+
+/* Custom Neumorphic Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--neu-bg);
+  box-shadow: inset 2px 2px 4px var(--neu-shadow-dark), inset -2px -2px 4px var(--neu-shadow-light);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cad8e8;
+  box-shadow: 2px 2px 4px var(--neu-shadow-dark), -2px -2px 4px var(--neu-shadow-light);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b6c8dc;
+}
+
+/* Glassmorphism & Premium UI Classes */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(148, 163, 184, 0.24);
-  box-shadow: 0 30px 80px -30px rgba(30, 64, 175, 0.35);
+  background: var(--neu-bg);
+  box-shadow: 10px 10px 30px var(--neu-shadow-dark), -10px -10px 30px var(--neu-shadow-light);
+  border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
 .premium-button {
-  position: relative;
-  overflow: hidden;
-  isolation: isolate;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8 52%, #0ea5e9);
-  box-shadow: 0 16px 32px -18px rgba(37, 99, 235, 0.8);
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e40af 100%);
+  color: #ffffff !important;
+  box-shadow: 0 12px 28px -6px rgba(37, 99, 235, 0.65), 0 4px 10px -2px rgba(37, 99, 235, 0.35);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.premium-button::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, transparent 100%);
-  transform: translateX(-120%);
-  animation: btn-shimmer 4s ease-in-out infinite;
+.premium-button:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 50%, #1e3a8a 100%);
+  box-shadow: 0 16px 32px -6px rgba(37, 99, 235, 0.75), 0 6px 14px -2px rgba(37, 99, 235, 0.45);
+  transform: translateY(-1px);
 }
 
-@keyframes btn-shimmer {
-  0%,
-  100% { transform: translateX(-120%); }
-  40%,
-  60% { transform: translateX(120%); }
-}
-
-.soft-shell {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(248, 250, 252, 0.88));
-  backdrop-filter: blur(14px);
-  border: 1px solid rgba(148, 163, 184, 0.18);
+.premium-button:active {
+  transform: translateY(0);
+  box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.25);
 }
 
