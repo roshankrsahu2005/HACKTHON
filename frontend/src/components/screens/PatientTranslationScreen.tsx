@@ -359,8 +359,8 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
   onSelectPatientLang,
   onSelectDoctorLang
 }) => {
-  // Screen sub-view tab: 'triage' (Voice Triage view) or 'chat' (Bilingual Chat view)
-  const [activeViewMode, setActiveViewMode] = useState<'triage' | 'chat'>('chat');
+  // Screen sub-view tab: 'triage' (Voice Triage view - default) or 'chat' (Bilingual Chat view)
+  const [activeViewMode, setActiveViewMode] = useState<'triage' | 'chat'>('triage');
 
   // AI Auto-Detection Mode (default ON for emergency readiness)
   const [isAutoDetectMode, setIsAutoDetectMode] = useState<boolean>(true);
@@ -767,6 +767,19 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
             <div className="neu-pressed p-1 rounded-2xl flex items-center gap-1">
               <button
                 type="button"
+                onClick={() => setActiveViewMode('triage')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+                  activeViewMode === 'triage'
+                    ? 'neu-button-primary shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Mic className="w-3.5 h-3.5" />
+                <span>Voice Triage</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setActiveViewMode('chat')}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
                   activeViewMode === 'chat'
@@ -777,19 +790,6 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
                 <MessageSquare className="w-3.5 h-3.5" />
                 <span>Live Chat</span>
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveViewMode('triage')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
-                  activeViewMode === 'triage'
-                    ? 'neu-button-primary shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Mic className="w-3.5 h-3.5" />
-                <span>Voice Triage</span>
               </button>
             </div>
 
