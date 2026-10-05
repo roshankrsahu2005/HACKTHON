@@ -24,6 +24,7 @@ import {
   Languages,
   Clock,
   Sparkle,
+  Reply,
   CornerDownLeft
 } from 'lucide-react';
 import { ScreenId, Language } from '../../types';
@@ -113,7 +114,7 @@ const DOCTOR_OFFLINE_TRANSLATIONS: Record<string, Record<string, string>> = {
   },
   'when did these symptoms begin?': {
     hi: 'ये लक्षण कब से शुरू हुए?',
-    bn: 'এই লক্ষণগুলো কখন শুরু হয়েছিল?',
+    bn: 'এই লক্ষণগুলো কখন शुरू হয়েছিল?',
     ta: 'இந்த அறிகுறிகள் எப்போது தொடங்கின?',
     te: 'ఈ లక్షణాలు ఎప్పుడు ప్రారంభమయ్యాయి?',
     mr: 'ही लक्षणे कधीपासून सुरू झाली?'
@@ -177,7 +178,8 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
   const [chatInput, setChatInput] = useState<string>('');
   const [chatSender, setChatSender] = useState<'patient' | 'doctor'>('patient');
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
-  const [isChatSending, setIsChatSending] = useState<boolean>(false);
+  const [isAutoReplyActive, setIsAutoReplyActive] = useState<boolean>(true);
+  const [replyingTo, setReplyingTo] = useState<ChatItem | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -401,8 +403,76 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
     }
   };
 
-  // Send a new bilingual chat message (Instant & Zero-Delay)
-  const handleSendChatMessage = async (e?: React.FormEvent, directText?: string, forcedSender?: 'patient' | 'doctor') => {
+  // Trigger Automatic Smart AI Clinical Reply
+  const triggerAutoReply = (originalMsg: ChatItem) => {
+    if (!isAutoReplyActive) return;
+
+    setTimeout(() => {
+      const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const replyMsgId = 'msg-reply-' + Date.now();
+
+      if (originalMsg.sender === 'patient') {
+        // Patient sent something -> Auto-reply as Doctor (in English, translated to Patient's native language)
+        let docEnglish = '';
+        let docNative = '';
+
+        const lower = originalMsg.originalText.toLowerCase();
+        if (lower.includes('दर्द') || lower.includes('chest') || lower.includes('pain') || originalMsg.triageLevel === 'red') {
+          docEnglish = 'Please sit upright and keep breathing slowly. We have alerted the trauma team and preparing oxygen and ECG leads now.';
+          docNative = patientLang.id === 'hi'
+            ? 'कृपया सीधे बैठें और धीरे-धीरे गहरी सांस लें। हमने इमरजेंसी टीम को सूचित कर दिया है और ऑक्सीजन व ईसीजी तैयार कर रहे हैं।'
+            : `[${patientLang.name} Translation]: Please sit upright. Medical emergency team alerted.`;
+        } else if (lower.includes('सांस') || lower.includes('breath')) {
+          docEnglish = 'Oxygen support is ready. Please lean forward slightly and relax your shoulders.';
+          docNative = patientLang.id === 'hi'
+            ? 'ऑक्सीजन सपोर्ट तैयार है। कृपया थोड़ा आगे झुकें और कंधों को ढीला छोड़ें।'
+            : `[${patientLang.name} Translation]: Oxygen is ready. Please lean forward and relax.`;
+        } else {
+          docEnglish = 'Understood. Doctor is evaluating your symptoms right now. Please remain seated.';
+          docNative = patientLang.id === 'hi'
+            ? 'समझ गया। डॉक्टर अभी आपके लक्षणों की जांच कर रहे हैं। कृपया आराम से बैठे रहें।'
+            : `[${patientLang.name} Translation]: Doctor is evaluating your symptoms. Please remain seated.`;
+        }
+
+        const autoDocMsg: ChatItem = {
+          id: replyMsgId,
+          sender: 'doctor',
+          originalText: docEnglish,
+          translatedText: docNative,
+          sourceLang: 'English',
+          targetLang: patientLang.name,
+          timestamp: timeNow
+        };
+
+        setChatMessages((prev) => [...prev, autoDocMsg]);
+      } else {
+        // Doctor sent instruction -> Auto-reply as Patient acknowledging
+        const patientNative = patientLang.id === 'hi'
+          ? 'जी डॉक्टर साहब, मैं समझ गया/गई। जैसा आप कह रहे हैं मैं वैसा ही कर रहा/रही हूँ।'
+          : `[${patientLang.name}]: Yes doctor, I understand and following your instructions.`;
+        const patientEng = 'Yes doctor, I understand and following your instructions.';
+
+        const autoPatientMsg: ChatItem = {
+          id: replyMsgId,
+          sender: 'patient',
+          originalText: patientNative,
+          translatedText: patientEng,
+          sourceLang: patientLang.name,
+          targetLang: 'English',
+          timestamp: timeNow
+        };
+
+        setChatMessages((prev) => [...prev, autoPatientMsg]);
+      }
+    }, 650);
+  };
+
+  // Send a new bilingual chat message (Instant & Zero-Delay with Auto-Reply)
+  const handleSendChatMessage = async (
+    e?: React.FormEvent,
+    directText?: string,
+    forcedSender?: 'patient' | 'doctor'
+  ) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -412,8 +482,8 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
     const textToSend = (directText || chatInput).trim();
     if (!textToSend) return;
 
-    setIsChatSending(true);
     const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const msgId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4);
 
     let translated = '';
     let triageLvl: 'red' | 'yellow' | 'green' = 'green';
@@ -444,7 +514,6 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
       if (offlineMatch && offlineMatch[patientLang.id]) {
         translated = offlineMatch[patientLang.id];
       } else if (patientLang.id === 'hi') {
-        // Fallback translation
         translated = `[हिन्दी अनुवाद]: ${textToSend}`;
       } else {
         translated = `[${patientLang.name} Translation]: ${textToSend}`;
@@ -470,7 +539,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
                   : data.englishTranslation || textToSend;
               if (liveTrans && liveTrans !== textToSend) {
                 setChatMessages((prev) =>
-                  prev.map((m) => (m.id === newMsg.id ? { ...m, translatedText: liveTrans } : m))
+                  prev.map((m) => (m.id === msgId ? { ...m, translatedText: liveTrans } : m))
                 );
               }
             }
@@ -480,7 +549,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
     }
 
     const newMsg: ChatItem = {
-      id: 'msg-' + Date.now(),
+      id: msgId,
       sender: sender,
       originalText: textToSend,
       translatedText: translated,
@@ -492,7 +561,10 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
 
     setChatMessages((prev) => [...prev, newMsg]);
     setChatInput('');
-    setIsChatSending(false);
+    setReplyingTo(null);
+
+    // Auto-trigger intelligent response
+    triggerAutoReply(newMsg);
   };
 
   // Play audio for specific chat message
@@ -517,6 +589,19 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
     );
   };
 
+  // Handle clicking "Reply" on a specific message
+  const handleInitiateReply = (msg: ChatItem) => {
+    setReplyingTo(msg);
+    // Switch to opposite role to reply
+    if (msg.sender === 'patient') {
+      setChatSender('doctor');
+      setChatInput('');
+    } else {
+      setChatSender('patient');
+      setChatInput('');
+    }
+  };
+
   return (
     <div className="flex flex-col justify-between h-full min-h-[640px] p-4 sm:p-7 bg-[#eef3fa] relative overflow-y-auto rounded-3xl">
       <div className="space-y-4">
@@ -536,7 +621,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
             <p className="text-xs text-slate-500 font-medium mt-0.5">
               {activeViewMode === 'triage'
                 ? 'Patient speaks in Indian regional languages — AI auto-detects & translates live'
-                : 'Interactive back-and-forth bilingual chat stream between Doctor & Patient'}
+                : 'Interactive back-and-forth bilingual chat stream with AI Auto-Reply'}
             </p>
           </div>
 
@@ -603,11 +688,25 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
         {/* ------------------------------------------------------------- */}
         {activeViewMode === 'chat' ? (
           <div className="space-y-3.5">
-            {/* Chat Top Controls & Simulation Bar */}
+            {/* Chat Top Controls & Auto-Reply Toggle */}
             <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Active Language Pair: <strong>{patientLang.name} ↔ English</strong></span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAutoReplyActive(!isAutoReplyActive)}
+                  className={`px-3 py-1 rounded-full text-[11px] font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+                    isAutoReplyActive
+                      ? 'neu-pill text-emerald-700 border border-emerald-300 bg-emerald-50'
+                      : 'neu-button text-slate-500'
+                  }`}
+                  title="Toggle automatic AI Doctor/Patient triage responses"
+                >
+                  <Bot className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+                  <span>AI Auto-Reply: {isAutoReplyActive ? 'ON (Active)' : 'OFF'}</span>
+                </button>
+                <span className="text-[10px] text-slate-400 hidden sm:inline font-semibold">
+                  · {patientLang.name} ↔ English
+                </span>
               </div>
 
               <div className="flex items-center gap-1.5">
@@ -616,30 +715,35 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
                   onClick={() =>
                     handleSendChatMessage(
                       undefined,
-                      'मुझे सांस लेने में बहुत परेशानी हो रही है।',
+                      'मुझे सीने में बहुत तेज दर्द हो रहा है।',
                       'patient'
                     )
                   }
                   className="px-2.5 py-1 rounded-xl neu-button text-[10px] font-extrabold text-blue-700 hover:text-blue-900 cursor-pointer"
+                  title="Simulate patient sending symptoms"
                 >
-                  + Test Patient Speech
+                  + Patient Message
                 </button>
                 <button
                   type="button"
                   onClick={() =>
                     handleSendChatMessage(
                       undefined,
-                      'We are starting oxygen support immediately.',
+                      'Please take deep breaths and stay calm.',
                       'doctor'
                     )
                   }
                   className="px-2.5 py-1 rounded-xl neu-button text-[10px] font-extrabold text-indigo-700 hover:text-indigo-900 cursor-pointer"
+                  title="Simulate doctor asking query"
                 >
-                  + Test Doctor Reply
+                  + Doctor Query
                 </button>
                 <button
                   type="button"
-                  onClick={() => setChatMessages([])}
+                  onClick={() => {
+                    setChatMessages([]);
+                    setReplyingTo(null);
+                  }}
                   className="p-1 rounded-xl neu-button text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
                   title="Clear Chat History"
                 >
@@ -653,9 +757,9 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
               {chatMessages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
                   <MessageSquare className="w-10 h-10 stroke-[1.5] mb-2 text-slate-300" />
-                  <p className="text-sm font-bold text-slate-600">No messages in current session</p>
+                  <p className="text-sm font-bold text-slate-600">Chat conversation is clear</p>
                   <p className="text-xs text-slate-400 mt-1">
-                    Select a sender below and type or speak with the Mic to start live translation.
+                    Send a message below as Patient or Doctor to start real-time bilingual conversation with auto-replies.
                   </p>
                 </div>
               ) : (
@@ -702,18 +806,32 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
                             <span>&rarr; {msg.translatedText}</span>
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={() => handlePlayChatMessageAudio(msg)}
-                            className={`p-1 rounded-lg transition-all cursor-pointer ${
-                              playingMessageId === msg.id
-                                ? 'neu-button-primary animate-pulse'
-                                : 'neu-button text-slate-500 hover:text-blue-600'
-                            }`}
-                            title="Listen translated speech"
-                          >
-                            <Volume2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            {/* 1-Tap Reply Button */}
+                            <button
+                              type="button"
+                              onClick={() => handleInitiateReply(msg)}
+                              className="px-2 py-0.5 rounded-lg neu-button text-[10px] font-bold text-slate-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer transition-all"
+                              title="Reply to this message"
+                            >
+                              <Reply className="w-3 h-3" />
+                              <span>Reply</span>
+                            </button>
+
+                            {/* Listen Audio Button */}
+                            <button
+                              type="button"
+                              onClick={() => handlePlayChatMessageAudio(msg)}
+                              className={`p-1 rounded-lg transition-all cursor-pointer ${
+                                playingMessageId === msg.id
+                                  ? 'neu-button-primary animate-pulse'
+                                  : 'neu-button text-slate-500 hover:text-blue-600'
+                              }`}
+                              title="Listen translated speech"
+                            >
+                              <Volume2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -722,6 +840,24 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
               )}
               <div ref={chatEndRef} />
             </div>
+
+            {/* Replying Context Banner if active */}
+            {replyingTo && (
+              <div className="p-2.5 neu-card rounded-2xl border border-blue-300 bg-blue-50/70 flex items-center justify-between gap-2 text-xs font-bold text-blue-900">
+                <div className="flex items-center gap-2 truncate">
+                  <Reply className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span className="text-slate-500">Replying to {replyingTo.sender}:</span>
+                  <span className="italic truncate font-semibold text-slate-800">"{replyingTo.originalText}"</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReplyingTo(null)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
 
             {/* Quick Clinical Prompts */}
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
@@ -773,7 +909,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
                 </div>
 
                 <span className="text-[10px] text-slate-400 font-semibold">
-                  Press Enter ↵ to Send
+                  Press Enter ↵ to Send & Auto-Reply
                 </span>
               </div>
 
@@ -807,7 +943,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
                 {/* Send button */}
                 <button
                   type="submit"
-                  disabled={!chatInput.trim() || isChatSending}
+                  disabled={!chatInput.trim()}
                   className="px-4 py-2.5 rounded-2xl neu-button-primary text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shadow-md"
                 >
                   <span>Send</span>
