@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, ArrowRight, Eye, EyeOff, ShieldCheck, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Lock, Mail, ArrowRight, Eye, EyeOff, ShieldCheck, Zap, Activity, Globe, HeartPulse, Sparkles, CheckCircle2 } from 'lucide-react';
 import {
   isSupabaseConfigured,
   getSupabaseClient,
@@ -15,20 +15,20 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
-  const [email, setEmail] = useState<string>('demo@hear2heal.com');
+  const [email, setEmail] = useState<string>('doctor@hear2heal.com');
   const [password, setPassword] = useState<string>('password123');
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [rememberMe, setRememberMe] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [loginSuccessMessage, setLoginSuccessMessage] = useState<string>('');
+  const [statusMessage, setStatusMessage] = useState<string>('');
 
   const executeLogin = (user: AppUser) => {
     setIsLoading(true);
-    setLoginSuccessMessage(`Signing in as ${user.name}...`);
+    setStatusMessage(`Entering Portal as ${user.name}...`);
     setTimeout(() => {
       setIsLoading(false);
       onLoginSuccess(user);
-    }, 100);
+    }, 250);
   };
 
   const handleSubmit = (e?: React.FormEvent | React.MouseEvent) => {
@@ -37,7 +37,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       e.stopPropagation();
     }
 
-    const trimmedEmail = email.trim() || 'demo@hear2heal.com';
+    const trimmedEmail = email.trim() || 'doctor@hear2heal.com';
     const userName = trimmedEmail.includes('@')
       ? trimmedEmail.split('@')[0]
       : trimmedEmail;
@@ -77,7 +77,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     }
 
     setIsLoading(true);
-    setLoginSuccessMessage('Authenticating with Google...');
+    setStatusMessage('Connecting with Google...');
 
     try {
       const client = getSupabaseClient();
@@ -109,35 +109,42 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         name: 'Dr. Clinician (Google)',
         email: 'clinician.google@hear2heal.com'
       });
-    }, 100);
+    }, 300);
   };
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 relative font-sans text-slate-800 overflow-hidden bg-[#eef3fa]">
-      <div className="absolute -top-20 left-10 h-56 w-56 rounded-full bg-blue-400/20 blur-3xl pointer-events-none" />
-      <div className="absolute right-0 top-20 h-64 w-64 rounded-full bg-cyan-400/20 blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-emerald-400/10 blur-3xl pointer-events-none" />
+      {/* Dynamic Background Glows */}
+      <div className="absolute -top-20 left-10 h-64 w-64 rounded-full bg-blue-400/20 blur-3xl pointer-events-none" />
+      <div className="absolute right-0 top-20 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-emerald-400/15 blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md relative z-10">
+        {/* Brand Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-[26px] bg-gradient-to-br from-blue-600 via-blue-700 to-cyan-500 text-white shadow-[0_26px_50px_-22px_rgba(37,99,235,0.9)] mb-4 ring-8 ring-white/60">
-            <span className="font-extrabold text-xl tracking-[0.14em]">H2H</span>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-[24px] bg-gradient-to-br from-blue-600 via-blue-700 to-cyan-500 text-white shadow-[0_20px_40px_-15px_rgba(37,99,235,0.8)] mb-3 ring-8 ring-white/70">
+            <span className="font-extrabold text-2xl tracking-[0.12em]">H2H</span>
           </div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-            Hear2Heal
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center justify-center gap-2">
+            <span>Hear2Heal</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-blue-100 text-blue-700 border border-blue-200">
+              Station
+            </span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-600 font-medium mt-2">
-            Sign in to access Overview & Clinical Triage Tools
+          <p className="text-xs sm:text-sm text-slate-600 font-medium mt-1">
+            Clinical Speech Translation & Emergency Triage Portal
           </p>
         </div>
 
-        <div className="glass-panel rounded-[30px] p-6 sm:p-8 border border-white/60 shadow-xl">
+        {/* Main Neumorphic Card */}
+        <div className="neu-card rounded-[32px] p-6 sm:p-8 border border-white/80 shadow-2xl relative overflow-hidden">
+          {/* Top Status Header */}
           <div className="mb-5 pb-3 border-b border-slate-200/80 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600/80">Secure Portal</p>
-              <h2 className="text-xl font-bold text-slate-900 mt-1">Sign In</h2>
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-600">Secure Station Access</p>
+              <h2 className="text-xl font-black text-slate-900 mt-0.5">Staff Sign In</h2>
             </div>
-            <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full flex items-center gap-1 ring-1 ring-emerald-200">
+            <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full flex items-center gap-1.5 ring-1 ring-emerald-200">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
               <span>Offline Ready</span>
             </span>
@@ -174,7 +181,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           {/* Divider */}
           <div className="relative flex items-center justify-center my-4">
             <div className="border-t border-slate-200/80 w-full" />
-            <span className="bg-[#f0f4f9] px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider absolute">
+            <span className="bg-[#eef3fa] px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider absolute">
               or clinician sign-in
             </span>
           </div>
@@ -182,7 +189,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           {/* Quick Role Selection Pills */}
           <div className="mb-4">
             <label className="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-[0.1em]">
-              1-Tap Quick Demo Sign-In
+              1-Tap Quick Clinician Sign-In
             </label>
             <div className="grid grid-cols-3 gap-1.5">
               <button
@@ -209,10 +216,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             </div>
           </div>
 
+          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-[0.12em]">
-                Email / Username
+              <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-[0.12em]">
+                Staff ID / Email
               </label>
               <div className="relative flex items-center">
                 <div className="absolute left-4 text-slate-400">
@@ -223,13 +231,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email or username"
-                  className="w-full pl-11 pr-3 py-3 text-sm font-semibold rounded-2xl border border-slate-200/80 bg-white/80 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
+                  className="w-full pl-11 pr-3 py-3 text-sm font-semibold rounded-2xl border border-slate-200/80 bg-white/90 focus:outline-none focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 shadow-inner"
                 />
               </div>
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-[0.12em]">Password</label>
               </div>
               <div className="relative flex items-center">
@@ -241,12 +249,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full pl-11 pr-11 py-3 text-sm font-semibold rounded-2xl border border-slate-200/80 bg-white/80 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
+                  className="w-full pl-11 pr-11 py-3 text-sm font-semibold rounded-2xl border border-slate-200/80 bg-white/90 focus:outline-none focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 shadow-inner"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
+                  className="absolute right-3.5 text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -261,33 +269,44 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
-                <span>Remember me</span>
+                <span>Remember session</span>
               </label>
             </div>
 
             <button
               type="submit"
-              onClick={handleSubmit}
               disabled={isLoading}
-              className="premium-button w-full mt-3 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-sm tracking-wide transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-75 shadow-[0_14px_30px_-10px_rgba(37,99,235,0.75)] border border-blue-400/40"
+              className="w-full mt-2 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-sm tracking-wide transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-75 shadow-[0_14px_30px_-10px_rgba(37,99,235,0.75)] border border-blue-400/40"
             >
               {isLoading ? (
                 <>
-                  <span className="w-4.5 h-4.5 border-2 border-white/35 border-t-white rounded-full animate-spin" />
-                  <span>{loginSuccessMessage || 'Signing In...'}</span>
+                  <span className="w-4 h-4 border-2 border-white/35 border-t-white rounded-full animate-spin" />
+                  <span>{statusMessage || 'Signing In...'}</span>
                 </>
               ) : (
                 <>
-                  <span>Sign In & Enter Overview</span>
+                  <span>Sign In & Open Station</span>
                   <ArrowRight className="w-4 h-4 stroke-[2.5]" />
                 </>
               )}
             </button>
           </form>
+
+          {/* 1-Click Instant Demo Login button */}
+          <div className="mt-4 pt-3 border-t border-slate-200/60 text-center">
+            <button
+              type="button"
+              onClick={() => handleQuickRoleSelect('Emergency Doctor', 'demo@hear2heal.com')}
+              className="w-full py-2.5 px-3 rounded-xl bg-blue-50/80 hover:bg-blue-100/80 border border-blue-200 text-blue-700 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
+              <span>Instant 1-Click Demo Login &rarr;</span>
+            </button>
+          </div>
         </div>
 
-        <p className="mt-5 text-center text-xs text-slate-500 font-medium">
-          Hear2Heal • Offline Medical Translation Assistant
+        <p className="mt-4 text-center text-xs text-slate-500 font-medium">
+          Hear2Heal • Offline Medical Translation & Triage Assistant
         </p>
       </div>
     </div>
