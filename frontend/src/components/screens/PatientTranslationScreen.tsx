@@ -78,8 +78,8 @@ const INITIAL_CHAT_MESSAGES: ChatItem[] = [
   {
     id: 'msg-2',
     sender: 'doctor',
-    originalText: 'Please sit upright and take deep breaths. We are attaching the ECG leads right now.',
-    translatedText: 'कृपया सीधे बैठें और गहरी सांस लें। हम अभी ईसीजी लीड लगा रहे हैं।',
+    originalText: 'Where exactly is the pain radiating, and did it start suddenly?',
+    translatedText: 'दर्द ठीक कहाँ फैल रहा है, और क्या यह अचानक शुरू हुआ था?',
     sourceLang: 'English',
     targetLang: 'Hindi',
     timestamp: '10:15 AM'
@@ -87,8 +87,8 @@ const INITIAL_CHAT_MESSAGES: ChatItem[] = [
   {
     id: 'msg-3',
     sender: 'patient',
-    originalText: 'दर्द मेरे बाएं हाथ और जबड़े की तरफ भी जा रहा है।',
-    translatedText: 'The pain is also radiating towards my left arm and jaw.',
+    originalText: 'दर्द सीने के बीच में है और बाएं हाथ और जबड़े की तरफ जा रहा है।',
+    translatedText: 'The pain is in the center of my chest radiating towards my left arm and jaw.',
     sourceLang: 'Hindi',
     targetLang: 'English',
     timestamp: '10:16 AM',
@@ -103,37 +103,246 @@ const QUICK_CHAT_PROMPTS = [
   'Please take deep breaths and stay calm.'
 ];
 
-// Offline instant translation dictionary for common doctor queries
-const DOCTOR_OFFLINE_TRANSLATIONS: Record<string, Record<string, string>> = {
-  'where is the pain radiating?': {
-    hi: 'दर्द कहाँ फैल रहा है?',
-    bn: 'ব্যথা কোথায় ছড়িয়ে পড়ছে?',
-    ta: 'வலி எங்கே பரவுகிறது?',
-    te: 'నొప్పి ఎక్కడికి వ్యాపిస్తోంది?',
-    mr: 'कळा/त्रास कुठे पसरत आहेत?'
-  },
-  'when did these symptoms begin?': {
-    hi: 'ये लक्षण कब से शुरू हुए?',
-    bn: 'এই লক্ষণগুলো কখন शुरू হয়েছিল?',
-    ta: 'இந்த அறிகுறிகள் எப்போது தொடங்கின?',
-    te: 'ఈ లక్షణాలు ఎప్పుడు ప్రారంభమయ్యాయి?',
-    mr: 'ही लक्षणे कधीपासून सुरू झाली?'
-  },
-  'do you have any known drug allergies?': {
-    hi: 'क्या आपको किसी दवा से एलर्जी है?',
-    bn: 'আপনার কি কোনো ওষুধে অ্যালার্জি আছে?',
-    ta: 'உங்களுக்கு ஏதேனும் மருந்து ஒவ்வாமை உள்ளதா?',
-    te: 'మీకు ఏదైనా మందులకు అలర్జీ ఉందా?',
-    mr: 'तुम्हाला कोणत्याही औषधाची ॲलर्जी आहे का?'
-  },
-  'please take deep breaths and stay calm.': {
-    hi: 'कृपया गहरी सांस लें और शांत रहें।',
-    bn: 'দয়া করে গভীর শ্বাস নিন এবং শান্ত থাকুন।',
-    ta: 'தயவுசெய்து ஆழமாக மூச்சு விடுங்கள், அமைதியாக இருங்கள்.',
-    te: 'దయచేసి లోతుగా శ్వాస తీసుకోండి మరియు ప్రశాంతంగా ఉండండి.',
-    mr: 'कृपया दीर्घ श्वास घ्या आणि शांत राहा.'
+// Contextual NLP Question-To-Answer Matching Engine
+function generateContextualAutoReply(
+  originalMsg: ChatItem,
+  patientLang: Language
+): { originalText: string; translatedText: string; sourceLang: string; targetLang: string; triageLevel?: 'red' | 'yellow' | 'green' } {
+  const text = (originalMsg.originalText + ' ' + originalMsg.translatedText).toLowerCase();
+  const isFromPatient = originalMsg.sender === 'patient';
+
+  if (isFromPatient) {
+    // -----------------------------------------------------------------
+    // PATIENT ASKED / REPORTED SYMPTOMS -> DOCTOR ANSWERS CONTEXTUALLY
+    // -----------------------------------------------------------------
+    if (
+      text.includes('chest') ||
+      text.includes('सीने') ||
+      text.includes('हार्ट') ||
+      text.includes('छाती') ||
+      text.includes('heart') ||
+      text.includes('attack') ||
+      originalMsg.triageLevel === 'red'
+    ) {
+      return {
+        originalText:
+          'Please keep sitting completely upright. We have prepared an emergency 12-lead ECG, blood cardiac markers, and starting oxygen support right away.',
+        translatedText:
+          patientLang.id === 'hi'
+            ? 'कृपया बिल्कुल सीधे बैठे रहें। हमने 12-लीड ईसीजी, कार्डियक ब्लड टेस्ट और ऑक्सीजन सपोर्ट तुरंत शुरू कर दिया है।'
+            : `[${patientLang.name}]: Please stay seated upright. ECG and oxygen support initiated immediately.`,
+        sourceLang: 'English',
+        targetLang: patientLang.name
+      };
+    } else if (
+      text.includes('सांस') ||
+      text.includes('breath') ||
+      text.includes('दम') ||
+      text.includes('घुटन') ||
+      text.includes('asthma')
+    ) {
+      return {
+        originalText:
+          'We are initiating 10 L/min high-flow oxygen through non-rebreather mask and preparing bronchodilator nebulization. Lean slightly forward.',
+        translatedText:
+          patientLang.id === 'hi'
+            ? 'हम 10 लीटर/मिनट हाई-फ्लो ऑक्सीजन मास्क लगा रहे हैं और नेबुलाइजर तैयार कर रहे हैं। हल्का आगे की ओर झुकें।'
+            : `[${patientLang.name}]: High-flow oxygen and nebulization prepared. Please lean forward.`,
+        sourceLang: 'English',
+        targetLang: patientLang.name
+      };
+    } else if (
+      text.includes('पेट') ||
+      text.includes('stomach') ||
+      text.includes('abdomen') ||
+      text.includes('उल्टी') ||
+      text.includes('vomit') ||
+      text.includes('मरोड़')
+    ) {
+      return {
+        originalText:
+          'Do not consume any solid food or water right now. We are administering an IV antispasmodic and scheduling an emergency abdominal ultrasound.',
+        translatedText:
+          patientLang.id === 'hi'
+            ? 'अभी कुछ भी ठोस खाना या पानी न पिएं। हम दर्द निवारक इंजेक्शन (IV) दे रहे हैं और तुरंत पेट का अल्ट्रासाउंड करवा रहे हैं।'
+            : `[${patientLang.name}]: Do not eat or drink. IV antispasmodic and ultrasound prepared.`,
+        sourceLang: 'English',
+        targetLang: patientLang.name
+      };
+    } else if (
+      text.includes('चक्कर') ||
+      text.includes('dizzy') ||
+      text.includes('faint') ||
+      text.includes('बेहोश') ||
+      text.includes('unconscious') ||
+      text.includes('गिर')
+    ) {
+      return {
+        originalText:
+          'Lie flat immediately with your feet elevated to restore blood flow to the brain. We are starting an IV saline drip and checking blood glucose.',
+        translatedText:
+          patientLang.id === 'hi'
+            ? 'तुरंत सीधे लेट जाएं और पैर थोड़े ऊपर उठाएं। हम ब्लड प्रेशर और शुगर चेक करके तुरंत ड्रिप (IV Fluids) शुरू कर रहे हैं।'
+            : `[${patientLang.name}]: Lie flat with legs elevated. IV fluids and vitals check started.`,
+        sourceLang: 'English',
+        targetLang: patientLang.name
+      };
+    } else if (
+      text.includes('खून') ||
+      text.includes('bleeding') ||
+      text.includes('चोट') ||
+      text.includes('injury') ||
+      text.includes('accident') ||
+      text.includes('wound')
+    ) {
+      return {
+        originalText:
+          'Apply firm, direct pressure over the bleeding wound with clean gauze. Keep the injured area elevated above heart level.',
+        translatedText:
+          patientLang.id === 'hi'
+            ? 'घाव पर साफ कपड़े या पट्टी से कसकर लगातार दबाव बनाए रखें। चोट वाले हिस्से को दिल के स्तर से ऊपर उठाएं।'
+            : `[${patientLang.name}]: Apply direct pressure on wound and keep elevated.`,
+        sourceLang: 'English',
+        targetLang: patientLang.name
+      };
+    } else if (
+      text.includes('बुखार') ||
+      text.includes('fever') ||
+      text.includes('तापमान') ||
+      text.includes('ठंड') ||
+      text.includes('temperature') ||
+      text.includes('chills')
+    ) {
+      return {
+        originalText:
+          'We are administering Paracetamol 650mg for fever and sending blood samples for complete blood count (CBC) and screening.',
+        translatedText:
+          patientLang.id === 'hi'
+            ? 'हम बुखार कम करने के लिए पैरासिटामोल 650mg दे रहे हैं और ब्लड टेस्ट (CBC) के लिए सैंपल ले रहे हैं।'
+            : `[${patientLang.name}]: Administering antipyretic medication and ordering blood panel.`,
+        sourceLang: 'English',
+        targetLang: patientLang.name
+      };
+    } else if (
+      text.includes('दवा') ||
+      text.includes('medicine') ||
+      text.includes('खानी') ||
+      text.includes('tablet') ||
+      text.includes('dose')
+    ) {
+      return {
+        originalText:
+          'Take the prescribed medicine twice daily after meals with water. Do not skip doses or take on an empty stomach.',
+        translatedText:
+          patientLang.id === 'hi'
+            ? 'निर्धारित दवा दिन में दो बार खाना खाने के बाद ताजे पानी से लें। खाली पेट न लें।'
+            : `[${patientLang.name}]: Take prescribed dosage twice daily after meals with water.`,
+        sourceLang: 'English',
+        targetLang: patientLang.name
+      };
+    } else {
+      return {
+        originalText:
+          'Understood. The clinical triage team has recorded your condition and is examining your vitals. Please stay relaxed.',
+        translatedText:
+          patientLang.id === 'hi'
+            ? 'समझ गया। मेडिकल टीम ने आपके लक्षणों को दर्ज कर लिया है और जांच कर रही है। कृपया शांत रहें।'
+            : `[${patientLang.name}]: Clinical triage team is reviewing your symptoms. Please remain seated.`,
+        sourceLang: 'English',
+        targetLang: patientLang.name
+      };
+    }
+  } else {
+    // -----------------------------------------------------------------
+    // DOCTOR ASKED A QUESTION -> PATIENT ANSWERS SPECIFICALLY
+    // -----------------------------------------------------------------
+    if (
+      text.includes('radiat') ||
+      text.includes('where') ||
+      text.includes('कहाँ') ||
+      text.includes('location') ||
+      text.includes('जगह')
+    ) {
+      return {
+        originalText: 'दर्द मेरे सीने के बीच में है और बाएं कंधे, हाथ और जबड़े की तरफ तेजी से फैल रहा है।',
+        translatedText:
+          'The pain is in the center of my chest radiating to my left shoulder, arm, and jaw.',
+        sourceLang: patientLang.name,
+        targetLang: 'English'
+      };
+    } else if (
+      text.includes('when') ||
+      text.includes('start') ||
+      text.includes('begin') ||
+      text.includes('कब') ||
+      text.includes('time') ||
+      text.includes('hours')
+    ) {
+      return {
+        originalText:
+          'यह दर्द लगभग 1 से 2 घंटे पहले अचानक भारी काम करते समय शुरू हुआ और लगातार बढ़ रहा है।',
+        translatedText:
+          'This pain started suddenly about 1 to 2 hours ago while doing physical work and is worsening.',
+        sourceLang: patientLang.name,
+        targetLang: 'English'
+      };
+    } else if (
+      text.includes('allerg') ||
+      text.includes('एलर्जी') ||
+      text.includes('history') ||
+      text.includes('bp') ||
+      text.includes('diabetes') ||
+      text.includes('शुगर')
+    ) {
+      return {
+        originalText:
+          'मुझे पेनिसिलिन दवा से एलर्जी है और मैं पिछले 4 साल से ब्लड प्रेशर की गोली ले रहा हूँ।',
+        translatedText:
+          'I am allergic to Penicillin and I have been taking daily medication for High Blood Pressure for 4 years.',
+        sourceLang: patientLang.name,
+        targetLang: 'English'
+      };
+    } else if (
+      text.includes('breath') ||
+      text.includes('deep') ||
+      text.includes('गहरी') ||
+      text.includes('calm') ||
+      text.includes('शांत')
+    ) {
+      return {
+        originalText:
+          'जी डॉक्टर साहब, मैं गहरी सांस ले रहा हूँ, लेकिन सांस अंदर खींचने पर सीने में भारीपन लग रहा है।',
+        translatedText:
+          'Yes doctor, I am taking deep breaths, but it feels heavy in my chest when inhaling.',
+        sourceLang: patientLang.name,
+        targetLang: 'English'
+      };
+    } else if (
+      text.includes('fever') ||
+      text.includes('vomit') ||
+      text.includes('बुखार') ||
+      text.includes('उल्टी')
+    ) {
+      return {
+        originalText:
+          'हाँ डॉक्टर साहब, कल रात से तेज बुखार और ठंड लग रही है, और सुबह दो बार उल्टी हुई है।',
+        translatedText:
+          'Yes doctor, high fever and chills since last night, and I vomited twice this morning.',
+        sourceLang: patientLang.name,
+        targetLang: 'English'
+      };
+    } else {
+      return {
+        originalText:
+          'जी डॉक्टर साहब, मैं आपकी बात समझ गया/गई। आप जैसा कह रहे हैं मैं वैसा ही कर रहा/रही हूँ।',
+        translatedText:
+          'Yes doctor, I understood your instruction. I am following exactly as you advised.',
+        sourceLang: patientLang.name,
+        targetLang: 'English'
+      };
+    }
   }
-};
+}
 
 interface PatientTranslationScreenProps {
   onNavigate: (screen: ScreenId) => void;
@@ -403,71 +612,30 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
     }
   };
 
-  // Trigger Automatic Smart AI Clinical Reply
+  // Trigger Contextual AI Clinical Auto-Reply
   const triggerAutoReply = (originalMsg: ChatItem) => {
     if (!isAutoReplyActive) return;
 
     setTimeout(() => {
       const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const replyMsgId = 'msg-reply-' + Date.now();
+      const replyData = generateContextualAutoReply(originalMsg, patientLang);
 
-      if (originalMsg.sender === 'patient') {
-        // Patient sent something -> Auto-reply as Doctor (in English, translated to Patient's native language)
-        let docEnglish = '';
-        let docNative = '';
+      const autoReplyMsg: ChatItem = {
+        id: 'msg-reply-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+        sender: originalMsg.sender === 'patient' ? 'doctor' : 'patient',
+        originalText: replyData.originalText,
+        translatedText: replyData.translatedText,
+        sourceLang: replyData.sourceLang,
+        targetLang: replyData.targetLang,
+        timestamp: timeNow,
+        triageLevel: replyData.triageLevel
+      };
 
-        const lower = originalMsg.originalText.toLowerCase();
-        if (lower.includes('दर्द') || lower.includes('chest') || lower.includes('pain') || originalMsg.triageLevel === 'red') {
-          docEnglish = 'Please sit upright and keep breathing slowly. We have alerted the trauma team and preparing oxygen and ECG leads now.';
-          docNative = patientLang.id === 'hi'
-            ? 'कृपया सीधे बैठें और धीरे-धीरे गहरी सांस लें। हमने इमरजेंसी टीम को सूचित कर दिया है और ऑक्सीजन व ईसीजी तैयार कर रहे हैं।'
-            : `[${patientLang.name} Translation]: Please sit upright. Medical emergency team alerted.`;
-        } else if (lower.includes('सांस') || lower.includes('breath')) {
-          docEnglish = 'Oxygen support is ready. Please lean forward slightly and relax your shoulders.';
-          docNative = patientLang.id === 'hi'
-            ? 'ऑक्सीजन सपोर्ट तैयार है। कृपया थोड़ा आगे झुकें और कंधों को ढीला छोड़ें।'
-            : `[${patientLang.name} Translation]: Oxygen is ready. Please lean forward and relax.`;
-        } else {
-          docEnglish = 'Understood. Doctor is evaluating your symptoms right now. Please remain seated.';
-          docNative = patientLang.id === 'hi'
-            ? 'समझ गया। डॉक्टर अभी आपके लक्षणों की जांच कर रहे हैं। कृपया आराम से बैठे रहें।'
-            : `[${patientLang.name} Translation]: Doctor is evaluating your symptoms. Please remain seated.`;
-        }
-
-        const autoDocMsg: ChatItem = {
-          id: replyMsgId,
-          sender: 'doctor',
-          originalText: docEnglish,
-          translatedText: docNative,
-          sourceLang: 'English',
-          targetLang: patientLang.name,
-          timestamp: timeNow
-        };
-
-        setChatMessages((prev) => [...prev, autoDocMsg]);
-      } else {
-        // Doctor sent instruction -> Auto-reply as Patient acknowledging
-        const patientNative = patientLang.id === 'hi'
-          ? 'जी डॉक्टर साहब, मैं समझ गया/गई। जैसा आप कह रहे हैं मैं वैसा ही कर रहा/रही हूँ।'
-          : `[${patientLang.name}]: Yes doctor, I understand and following your instructions.`;
-        const patientEng = 'Yes doctor, I understand and following your instructions.';
-
-        const autoPatientMsg: ChatItem = {
-          id: replyMsgId,
-          sender: 'patient',
-          originalText: patientNative,
-          translatedText: patientEng,
-          sourceLang: patientLang.name,
-          targetLang: 'English',
-          timestamp: timeNow
-        };
-
-        setChatMessages((prev) => [...prev, autoPatientMsg]);
-      }
-    }, 650);
+      setChatMessages((prev) => [...prev, autoReplyMsg]);
+    }, 700);
   };
 
-  // Send a new bilingual chat message (Instant & Zero-Delay with Auto-Reply)
+  // Send a new bilingual chat message
   const handleSendChatMessage = async (
     e?: React.FormEvent,
     directText?: string,
@@ -489,15 +657,11 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
     let triageLvl: 'red' | 'yellow' | 'green' = 'green';
 
     if (sender === 'patient') {
-      // 1. Instant NLP analysis for Patient
       const parsed = processPatientSpeech(textToSend, 'en');
       translated = parsed.englishTranslation;
       triageLvl = parsed.triageLevel;
-
-      // Update active triage state
       setInputText(textToSend);
 
-      // Cloud sync to Supabase
       syncTranslationToSupabase(
         'patient',
         parsed.detectedLanguage.name,
@@ -507,45 +671,19 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
         triageLvl
       );
     } else {
-      // 2. Doctor Query -> Check offline translation map first
+      // Doctor Query -> Instant translation
       const lower = textToSend.toLowerCase().trim();
-      const offlineMatch = DOCTOR_OFFLINE_TRANSLATIONS[lower];
-
-      if (offlineMatch && offlineMatch[patientLang.id]) {
-        translated = offlineMatch[patientLang.id];
-      } else if (patientLang.id === 'hi') {
-        translated = `[हिन्दी अनुवाद]: ${textToSend}`;
+      if (lower.includes('radiat') || lower.includes('where')) {
+        translated = patientLang.id === 'hi' ? 'दर्द कहाँ फैल रहा है?' : `[${patientLang.name}]: Where is pain?`;
+      } else if (lower.includes('when') || lower.includes('start') || lower.includes('begin')) {
+        translated = patientLang.id === 'hi' ? 'ये लक्षण कब से शुरू हुए?' : `[${patientLang.name}]: When did it start?`;
+      } else if (lower.includes('allerg') || lower.includes('bp') || lower.includes('diabetes')) {
+        translated = patientLang.id === 'hi' ? 'क्या आपको कोई एलर्जी या बीपी/शुगर है?' : `[${patientLang.name}]: Any allergies/conditions?`;
+      } else if (lower.includes('breath') || lower.includes('deep') || lower.includes('calm')) {
+        translated = patientLang.id === 'hi' ? 'कृपया गहरी सांस लें और शांत रहें।' : `[${patientLang.name}]: Take deep breaths.`;
       } else {
-        translated = `[${patientLang.name} Translation]: ${textToSend}`;
+        translated = patientLang.id === 'hi' ? `[हिन्दी अनुवाद]: ${textToSend}` : `[${patientLang.name} Translation]: ${textToSend}`;
       }
-
-      // Try background backend translation
-      try {
-        fetch('http://localhost:5000/api/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: textToSend,
-            sourceLang: 'English',
-            targetLang: patientLang.id
-          })
-        })
-          .then((res) => (res.ok ? res.json() : null))
-          .then((data) => {
-            if (data) {
-              const liveTrans =
-                patientLang.id === 'hi'
-                  ? data.hindiTranslation
-                  : data.englishTranslation || textToSend;
-              if (liveTrans && liveTrans !== textToSend) {
-                setChatMessages((prev) =>
-                  prev.map((m) => (m.id === msgId ? { ...m, translatedText: liveTrans } : m))
-                );
-              }
-            }
-          })
-          .catch(() => {});
-      } catch {}
     }
 
     const newMsg: ChatItem = {
@@ -563,7 +701,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
     setChatInput('');
     setReplyingTo(null);
 
-    // Auto-trigger intelligent response
+    // Auto-trigger intelligent contextual reply
     triggerAutoReply(newMsg);
   };
 
@@ -592,7 +730,6 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
   // Handle clicking "Reply" on a specific message
   const handleInitiateReply = (msg: ChatItem) => {
     setReplyingTo(msg);
-    // Switch to opposite role to reply
     if (msg.sender === 'patient') {
       setChatSender('doctor');
       setChatInput('');
@@ -702,7 +839,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
                   title="Toggle automatic AI Doctor/Patient triage responses"
                 >
                   <Bot className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
-                  <span>AI Auto-Reply: {isAutoReplyActive ? 'ON (Active)' : 'OFF'}</span>
+                  <span>Contextual AI Auto-Reply: {isAutoReplyActive ? 'ON' : 'OFF'}</span>
                 </button>
                 <span className="text-[10px] text-slate-400 hidden sm:inline font-semibold">
                   · {patientLang.name} ↔ English
@@ -715,28 +852,28 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
                   onClick={() =>
                     handleSendChatMessage(
                       undefined,
-                      'मुझे सीने में बहुत तेज दर्द हो रहा है।',
+                      'मुझे सीने में बहुत तेज दर्द हो रहा है और सांस फूल रही है।',
                       'patient'
                     )
                   }
                   className="px-2.5 py-1 rounded-xl neu-button text-[10px] font-extrabold text-blue-700 hover:text-blue-900 cursor-pointer"
-                  title="Simulate patient sending symptoms"
+                  title="Simulate patient sending chest pain"
                 >
-                  + Patient Message
+                  + Patient: Chest Pain
                 </button>
                 <button
                   type="button"
                   onClick={() =>
                     handleSendChatMessage(
                       undefined,
-                      'Please take deep breaths and stay calm.',
+                      'Where exactly is the pain radiating?',
                       'doctor'
                     )
                   }
                   className="px-2.5 py-1 rounded-xl neu-button text-[10px] font-extrabold text-indigo-700 hover:text-indigo-900 cursor-pointer"
-                  title="Simulate doctor asking query"
+                  title="Simulate doctor asking radiation"
                 >
-                  + Doctor Query
+                  + Doctor: Radiation Query
                 </button>
                 <button
                   type="button"
