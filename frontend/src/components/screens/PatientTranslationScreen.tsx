@@ -15,7 +15,8 @@ import {
   Globe2,
   Zap,
   RotateCcw,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react';
 import { ScreenId, Language } from '../../types';
 import { playTextToSpeech, stopTextToSpeech } from '../../utils/audio';
@@ -27,6 +28,21 @@ import {
 } from '../../utils/aiTranslator';
 import { LANGUAGES } from '../../data/mockData';
 import { syncTranslationToSupabase, syncConsultationToSupabase } from '../../utils/supabase';
+
+const LANGUAGE_SPEECH_MAP: Record<string, string> = {
+  hi: 'hi-IN',
+  en: 'en-US',
+  bn: 'bn-IN',
+  ta: 'ta-IN',
+  te: 'te-IN',
+  mr: 'mr-IN',
+  gu: 'gu-IN',
+  pa: 'pa-IN',
+  es: 'es-ES',
+  ar: 'ar-SA',
+  fr: 'fr-FR',
+  ur: 'ur-PK'
+};
 
 interface PatientTranslationScreenProps {
   onNavigate: (screen: ScreenId) => void;
@@ -66,10 +82,17 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
   // Speech Recognition ref
   const recognitionRef = useRef<any>(null);
 
-  // Clean up audio on unmount
+  // Clean up audio & speech recognition on unmount
   useEffect(() => {
     return () => {
       stopTextToSpeech();
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {
+          // ignore
+        }
+      }
     };
   }, []);
 
@@ -141,6 +164,10 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
         localResult.triageLevel
       );
     }
+
+    return () => {
+      isCancelled = true;
+    };
   }, [inputText, doctorOutputLangId, isAutoDetectMode]);
 
   // Sync doctorLang from parent if changed
@@ -183,15 +210,16 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
   const handleSelectPreset = (preset: EmergencyPreset) => {
     setActivePresetId(preset.id);
     setInputText(preset.patientText);
+    setRecognitionError(null);
   };
 
-  // Toggle Microphone with real Web Speech API + simulated fallback
+  // Toggle Microphone with real Web Speech API + gracefully handled states
   const handleToggleRecord = () => {
     if (isRecording) {
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
-        } catch (e) {
+        } catch {
           // ignore
         }
       }
@@ -199,56 +227,87 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
       return;
     }
 
+    // Stop any ongoing audio synthesis
+    stopTextToSpeech();
+    setIsPlayingAudio(false);
     setRecognitionError(null);
-    setIsRecording(true);
 
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-    if (SpeechRecognition) {
-      try {
-        const recognition = new SpeechRecognition();
-        recognitionRef.current = recognition;
-        recognition.continuous = false;
-        recognition.interimResults = true;
-        recognition.lang = isAutoDetectMode ? '' : patientLang.id === 'hi' ? 'hi-IN' : 'en-US';
-
-        recognition.onresult = (event: any) => {
-          let transcript = '';
-          for (let i = 0; i < event.results.length; i++) {
-            transcript += event.results[i][0].transcript;
-          }
-          if (transcript.trim()) {
-            setInputText(transcript);
-            setActivePresetId('');
-          }
-        };
-
-        recognition.onerror = (event: any) => {
-          console.warn('Speech recognition notice:', event.error);
-          setIsRecording(false);
-        };
-
-        recognition.onend = () => {
-          setIsRecording(false);
-        };
-
-        recognition.start();
-        return;
-      } catch (err) {
-        console.warn('Speech recognition launch fallback:', err);
-      }
+    if (!SpeechRecognition) {
+      setRecognitionError(
+        'Speech recognition is not supported in this browser. Please use the Keyboard or Emergency Presets.'
+      );
+      setIsTypingMode(true);
+      return;
     }
 
-    // Fallback simulation if speech recognition is unsupported or blocked
-    setTimeout(() => {
+    try {
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      // Select proper locale based on patientLang or default to Hindi for Indian medical triage
+      const targetLocale = LANGUAGE_SPEECH_MAP[patientLang.id] || 'hi-IN';
+      recognition.lang = targetLocale;
+
+      recognition.onstart = () => {
+        setIsRecording(true);
+        setRecognitionError(null);
+      };
+
+      recognition.onresult = (event: any) => {
+        let interimText = '';
+        let finalText = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const trans = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalText += trans;
+          } else {
+            interimText += trans;
+          }
+        }
+        const activeText = (finalText || interimText).trim();
+        if (activeText) {
+          setInputText(activeText);
+          setActivePresetId('');
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition notice:', event.error);
+        setIsRecording(false);
+        if (event.error === 'not-allowed') {
+          setRecognitionError(
+            'Microphone access was blocked. Please grant microphone permission in your browser or select an Emergency Preset below.'
+          );
+        } else if (event.error === 'no-speech') {
+          setRecognitionError('No speech was detected. Please tap the mic and speak clearly.');
+        } else {
+          setRecognitionError(`Speech notice (${event.error}). You can tap any preset or use keyboard typing.`);
+        }
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognition.start();
+    } catch (err) {
+      console.warn('Speech recognition startup error:', err);
       setIsRecording(false);
-    }, 2800);
+      setRecognitionError(
+        'Microphone could not be started. You can use the Quick Emergency Presets or Keyboard mode.'
+      );
+    }
   };
 
   return (
     <div className="flex flex-col justify-between h-full min-h-[640px] p-5 sm:p-8 bg-[#eef3fa] relative overflow-y-auto rounded-3xl">
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* Top Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -278,9 +337,26 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
           </div>
         </div>
 
+        {/* Recognition Error Banner if any */}
+        {recognitionError && (
+          <div className="p-3.5 neu-card rounded-2xl border border-amber-300 bg-amber-50/80 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 text-xs font-bold text-amber-900">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>{recognitionError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRecognitionError(null)}
+              className="p-1 rounded-lg text-amber-700 hover:text-amber-900 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* AI Zero-Click Auto-Detect Mode Banner */}
         <div className="p-4 neu-card rounded-3xl">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:flex-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl neu-raised text-blue-600 flex items-center justify-center shrink-0">
                 <Bot className="w-5 h-5 stroke-[2.4]" />
@@ -403,32 +479,32 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
           ) : (
             <div className="p-4 neu-pressed rounded-2xl min-h-[72px] flex items-center justify-between gap-3">
               <p className="text-base sm:text-lg font-black text-slate-900 leading-relaxed">
-                {inputText ? `"${inputText}"` : <span className="text-slate-400 font-normal italic">Tap Mic below or switch to Keyboard mode to enter symptoms...</span>}
+                {inputText ? `"${inputText}"` : <span className="text-slate-400 font-normal italic">Tap Mic below to speak symptoms or select an emergency preset...</span>}
               </p>
             </div>
           )}
 
           {/* Audio Telemetry Waveform */}
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-1.5 neu-pressed px-3 py-2 rounded-xl">
               {[30, 65, 95, 45, 80, 25, 90, 50, 75, 35, 85, 40, 60, 90, 45].map((h, i) => (
                 <span
                   key={i}
                   style={{
                     height: isRecording
-                      ? `${Math.max(20, (h + (i % 3) * 20) % 100)}px`
+                      ? `${Math.max(16, (h + (i % 4) * 22) % 95)}px`
                       : '8px'
                   }}
                   className={`w-1 rounded-full transition-all duration-150 ${
                     isRecording
-                      ? 'bg-gradient-to-t from-blue-600 to-indigo-500 animate-pulse'
+                      ? 'bg-gradient-to-t from-red-500 via-rose-500 to-blue-600 animate-pulse'
                       : 'bg-slate-400'
                   }`}
                 />
               ))}
             </div>
             <span className="text-[11px] font-mono neu-pill px-3 py-1 font-extrabold text-slate-600">
-              {isRecording ? '🔴 REC LIVE' : 'MIC STANDBY'}
+              {isRecording ? '🔴 LISTENING LIVE' : 'MIC STANDBY'}
             </span>
           </div>
         </div>
@@ -438,8 +514,8 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
           <div className="relative flex items-center justify-center">
             {isRecording && (
               <>
-                <div className="absolute w-28 h-28 rounded-full bg-red-500/20 animate-ping pointer-events-none" />
-                <div className="absolute w-32 h-32 rounded-full bg-blue-500/15 animate-pulse pointer-events-none" />
+                <div className="absolute w-28 h-28 rounded-full bg-red-500/25 animate-ping pointer-events-none" />
+                <div className="absolute w-36 h-36 rounded-full bg-blue-500/20 animate-pulse pointer-events-none" />
               </>
             )}
 
@@ -449,7 +525,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
               className={`w-20 h-20 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xl ${
                 isRecording
                   ? 'neu-button-emergency ring-4 ring-red-300 scale-105'
-                  : 'neu-button-primary'
+                  : 'neu-button-primary hover:scale-105 active:scale-95'
               }`}
               title={isRecording ? 'Stop listening' : 'Tap to speak in any language'}
             >
@@ -463,7 +539,7 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
 
           <div className="text-center space-y-0.5">
             <h4 className="text-xs font-black text-slate-900">
-              {isRecording ? '🎙️ Recording Patient Speech...' : 'Tap Mic to Speak in Any Indian Language'}
+              {isRecording ? '🎙️ Listening to Patient Speech... Tap to Stop' : 'Tap Mic to Speak in Any Indian Language'}
             </h4>
             <p className="text-[11px] text-slate-500 font-medium">
               Real-time clinical NLP & triage severity detection
@@ -674,4 +750,3 @@ export const PatientTranslationScreen: React.FC<PatientTranslationScreenProps> =
     </div>
   );
 };
-
