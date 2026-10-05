@@ -27,13 +27,15 @@ import {
   Database,
   Settings
 } from 'lucide-react';
-import { ScreenId, Language, PainSeverity, PatientProfile, ThemeOption } from './types';
+import { ScreenId, Language, PainSeverity, PatientProfile, ThemeOption, PatientVitals, INITIAL_VITALS } from './types';
 import { LANGUAGES, INITIAL_PATIENT_PROFILE } from './data/mockData';
 import { MobileFrame } from './components/MobileFrame';
 import { ScreenSwitcherDrawer } from './components/ScreenSwitcherDrawer';
 import { SidebarDashboard } from './components/SidebarDashboard';
 import { AllScreensGallery } from './components/AllScreensGallery';
 import { SupabaseConnectModal } from './components/SupabaseConnectModal';
+import { BedsideVitalsWidget } from './components/vitals/BedsideVitalsWidget';
+import { BedsideVitalsModal } from './components/vitals/BedsideVitalsModal';
 import { LoginScreen, AppUser } from './components/screens/LoginScreen';
 import { SplashScreen } from './components/screens/SplashScreen';
 import { LanguageSelectScreen } from './components/screens/LanguageSelectScreen';
@@ -126,6 +128,8 @@ export default function App() {
   const [selectedLocation, setSelectedLocation] = useState<string>('chest');
   const [painSeverity, setPainSeverity] = useState<PainSeverity>('severe');
   const [patientProfile, setPatientProfile] = useState<PatientProfile>(INITIAL_PATIENT_PROFILE);
+  const [patientVitals, setPatientVitals] = useState<PatientVitals>(INITIAL_VITALS);
+  const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
 
   // Handle successful login -> Redirects directly to Overview ('splash')
   const handleLoginSuccess = (user: AppUser) => {
@@ -331,6 +335,14 @@ export default function App() {
                 (Doctor)
               </span>
             </button>
+          </div>
+
+          {/* Bedside Patient Vitals & Telemetry Chip */}
+          <div className="hidden sm:block">
+            <BedsideVitalsWidget
+              vitals={patientVitals}
+              onOpenModal={() => setIsVitalsModalOpen(true)}
+            />
           </div>
 
           {/* TOP RIGHT CORNER: Profile, Settings, SOS, Clinician Info */}
@@ -562,6 +574,15 @@ export default function App() {
       <SupabaseConnectModal
         isOpen={isSupabaseModalOpen}
         onClose={() => setIsSupabaseModalOpen(false)}
+      />
+
+      {/* Interactive Bedside Patient Vitals & Telemetry Monitor */}
+      <BedsideVitalsModal
+        isOpen={isVitalsModalOpen}
+        onClose={() => setIsVitalsModalOpen(false)}
+        vitals={patientVitals}
+        onUpdateVitals={setPatientVitals}
+        onNavigate={setCurrentScreen}
       />
     </div>
   );
