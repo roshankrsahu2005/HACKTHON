@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, ArrowRight, Eye, EyeOff, ShieldCheck, Zap, Activity, Globe, HeartPulse, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Lock, Mail, ArrowRight, Eye, EyeOff, ShieldCheck, Sparkles, CheckCircle2, Zap, UserCheck, Stethoscope } from 'lucide-react';
 import {
   isSupabaseConfigured,
   getSupabaseClient,
@@ -24,17 +24,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
   const executeLogin = (user: AppUser) => {
     setIsLoading(true);
-    setStatusMessage(`Entering Portal as ${user.name}...`);
+    setStatusMessage(`Entering workstation as ${user.name}...`);
     setTimeout(() => {
       setIsLoading(false);
       onLoginSuccess(user);
-    }, 250);
+    }, 150);
   };
 
-  const handleSubmit = (e?: React.FormEvent | React.MouseEvent) => {
+  const handleSubmit = (e?: React.FormEvent) => {
     if (e) {
       e.preventDefault();
-      e.stopPropagation();
     }
 
     const trimmedEmail = email.trim() || 'doctor@hear2heal.com';
@@ -42,17 +41,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       ? trimmedEmail.split('@')[0]
       : trimmedEmail;
 
-    // Fire Supabase auth in background (non-blocking)
+    // Supabase background auth attempt (non-blocking)
     try {
       const client = getSupabaseClient();
       if (client && isSupabaseConfigured()) {
         client.auth.signInWithPassword({
           email: trimmedEmail.includes('@') ? trimmedEmail : `${trimmedEmail}@hear2heal.com`,
           password: password || 'password123'
-        }).catch(() => {});
+        }).catch(() => { });
       }
     } catch {
-      // Ignore background auth error
+      // Non-blocking fallback
     }
 
     executeLogin({
@@ -77,7 +76,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     }
 
     setIsLoading(true);
-    setStatusMessage('Connecting with Google...');
+    setStatusMessage('Authenticating with Google...');
 
     try {
       const client = getSupabaseClient();
@@ -99,7 +98,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         }
       }
     } catch (err) {
-      console.warn('Google sign in note:', err);
+      console.warn('Google sign-in note:', err);
     }
 
     // Direct Google Clinician Session fallback
@@ -109,19 +108,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         name: 'Dr. Clinician (Google)',
         email: 'clinician.google@hear2heal.com'
       });
-    }, 300);
+    }, 150);
   };
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 relative font-sans text-slate-800 overflow-hidden bg-[#eef3fa]">
-      {/* Dynamic Background Glows */}
+      {/* Background Soft Glows */}
       <div className="absolute -top-20 left-10 h-64 w-64 rounded-full bg-blue-400/20 blur-3xl pointer-events-none" />
       <div className="absolute right-0 top-20 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-emerald-400/15 blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md relative z-10">
         {/* Brand Header */}
-        <div className="text-center mb-6">
+        <div className="text-center mb-5">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-[24px] bg-gradient-to-br from-blue-600 via-blue-700 to-cyan-500 text-white shadow-[0_20px_40px_-15px_rgba(37,99,235,0.8)] mb-3 ring-8 ring-white/70">
             <span className="font-extrabold text-2xl tracking-[0.12em]">H2H</span>
           </div>
@@ -136,21 +135,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           </p>
         </div>
 
-        {/* Main Neumorphic Card */}
+        {/* Main Card */}
         <div className="neu-card rounded-[32px] p-6 sm:p-8 border border-white/80 shadow-2xl relative overflow-hidden">
           {/* Top Status Header */}
-          <div className="mb-5 pb-3 border-b border-slate-200/80 flex items-center justify-between">
+          <div className="mb-4 pb-3 border-b border-slate-200/80 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-600">Secure Station Access</p>
-              <h2 className="text-xl font-black text-slate-900 mt-0.5">Staff Sign In</h2>
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-600">Secure Station</p>
+              <h2 className="text-lg font-black text-slate-900 mt-0.5">Staff Sign In</h2>
             </div>
-            <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full flex items-center gap-1.5 ring-1 ring-emerald-200">
+            <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full flex items-center gap-1.5 ring-1 ring-emerald-200">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
               <span>Offline Ready</span>
             </span>
           </div>
 
-          {/* Sign in with Google Button */}
+          {/* Continue with Google Button */}
           <button
             type="button"
             onClick={handleGoogleSignIn}
@@ -179,51 +178,54 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           </button>
 
           {/* Divider */}
-          <div className="relative flex items-center justify-center my-4">
+          <div className="relative flex items-center justify-center my-3.5">
             <div className="border-t border-slate-200/80 w-full" />
-            <span className="bg-[#eef3fa] px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider absolute">
-              or clinician sign-in
+            <span className="bg-[#eef3fa] px-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest absolute">
+              or select clinician role
             </span>
           </div>
 
-          {/* Quick Role Selection Pills */}
+          {/* 1-Tap Quick Clinician Preset Buttons */}
           <div className="mb-4">
-            <label className="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-[0.1em]">
+            <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-[0.1em]">
               1-Tap Quick Clinician Sign-In
             </label>
             <div className="grid grid-cols-3 gap-1.5">
               <button
                 type="button"
                 onClick={() => handleQuickRoleSelect('Dr. Sharma', 'doctor@hear2heal.com')}
-                className="py-2 px-2 rounded-xl neu-button text-[11px] font-bold text-slate-700 hover:text-blue-700 hover:border-blue-400 cursor-pointer transition-all text-center truncate"
+                className="py-2.5 px-2 rounded-xl neu-button text-[11px] font-bold text-slate-700 hover:text-blue-700 hover:border-blue-400 cursor-pointer transition-all text-center truncate flex flex-col items-center gap-1"
               >
-                👨‍⚕️ Doctor
+                <span className="text-base">👨‍⚕️</span>
+                <span className="leading-none">Dr. Sharma</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleQuickRoleSelect('Nurse Priya', 'nurse@hear2heal.com')}
-                className="py-2 px-2 rounded-xl neu-button text-[11px] font-bold text-slate-700 hover:text-blue-700 hover:border-blue-400 cursor-pointer transition-all text-center truncate"
+                className="py-2.5 px-2 rounded-xl neu-button text-[11px] font-bold text-slate-700 hover:text-blue-700 hover:border-blue-400 cursor-pointer transition-all text-center truncate flex flex-col items-center gap-1"
               >
-                👩‍⚕️ Nurse / EMT
+                <span className="text-base">👩‍⚕️</span>
+                <span className="leading-none">Nurse Priya</span>
               </button>
               <button
                 type="button"
-                onClick={() => handleQuickRoleSelect('Triage Officer', 'triage@hear2heal.com')}
-                className="py-2 px-2 rounded-xl neu-button text-[11px] font-bold text-slate-700 hover:text-blue-700 hover:border-blue-400 cursor-pointer transition-all text-center truncate"
+                onClick={() => handleQuickRoleSelect('Triage Lead', 'triage@hear2heal.com')}
+                className="py-2.5 px-2 rounded-xl neu-button text-[11px] font-bold text-slate-700 hover:text-blue-700 hover:border-blue-400 cursor-pointer transition-all text-center truncate flex flex-col items-center gap-1"
               >
-                🚨 Triage Lead
+                <span className="text-base">🚨</span>
+                <span className="leading-none">Triage Lead</span>
               </button>
             </div>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3.5">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-[0.12em]">
+              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-[0.1em]">
                 Staff ID / Email
               </label>
               <div className="relative flex items-center">
-                <div className="absolute left-4 text-slate-400">
+                <div className="absolute left-3.5 text-slate-400">
                   <Mail className="w-4 h-4" />
                 </div>
                 <input
@@ -231,17 +233,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email or username"
-                  className="w-full pl-11 pr-3 py-3 text-sm font-semibold rounded-2xl border border-slate-200/80 bg-white/90 focus:outline-none focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 shadow-inner"
+                  className="w-full pl-10 pr-3 py-2.5 text-sm font-semibold rounded-2xl border border-slate-200/80 bg-white/90 focus:outline-none focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 shadow-inner"
                 />
               </div>
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-[0.12em]">Password</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-[0.1em]">Password</label>
               </div>
               <div className="relative flex items-center">
-                <div className="absolute left-4 text-slate-400">
+                <div className="absolute left-3.5 text-slate-400">
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
@@ -249,19 +251,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full pl-11 pr-11 py-3 text-sm font-semibold rounded-2xl border border-slate-200/80 bg-white/90 focus:outline-none focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 shadow-inner"
+                  className="w-full pl-10 pr-10 py-2.5 text-sm font-semibold rounded-2xl border border-slate-200/80 bg-white/90 focus:outline-none focus:ring-4 focus:ring-blue-500/15 focus:border-blue-500 shadow-inner"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
+                  className="absolute right-3 text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-1 text-xs">
+            <div className="flex items-center justify-between pt-0.5 text-xs">
               <label className="flex items-center gap-2 text-slate-600 font-medium cursor-pointer">
                 <input
                   type="checkbox"
@@ -276,7 +278,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full mt-2 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-sm tracking-wide transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-75 shadow-[0_14px_30px_-10px_rgba(37,99,235,0.75)] border border-blue-400/40"
+              className="w-full mt-2 py-3 px-6 rounded-2xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-sm tracking-wide transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-75 shadow-[0_12px_26px_-8px_rgba(37,99,235,0.7)] border border-blue-400/40"
             >
               {isLoading ? (
                 <>
@@ -285,21 +287,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 </>
               ) : (
                 <>
-                  <span>Sign In & Open Station</span>
+                  <span>Sign In & Enter Overview</span>
                   <ArrowRight className="w-4 h-4 stroke-[2.5]" />
                 </>
               )}
             </button>
           </form>
 
-          {/* 1-Click Instant Demo Login button */}
-          <div className="mt-4 pt-3 border-t border-slate-200/60 text-center">
+          {/* 1-Click Instant Demo Login */}
+          <div className="mt-3.5 pt-3 border-t border-slate-200/60 text-center">
             <button
               type="button"
-              onClick={() => handleQuickRoleSelect('Emergency Doctor', 'demo@hear2heal.com')}
-              className="w-full py-2.5 px-3 rounded-xl bg-blue-50/80 hover:bg-blue-100/80 border border-blue-200 text-blue-700 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+              onClick={() => handleQuickRoleSelect('Emergency Clinician', 'demo@hear2heal.com')}
+              className="w-full py-2.5 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
             >
-              <Zap className="w-3.5 h-3.5 text-amber-500" />
+              <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
               <span>Instant 1-Click Demo Login &rarr;</span>
             </button>
           </div>
